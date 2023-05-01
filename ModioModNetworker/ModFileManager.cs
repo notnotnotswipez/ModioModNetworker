@@ -104,7 +104,7 @@ namespace ModioModNetworker
             // Delete the zip
             File.Delete(downloadPath);
             // Delete loose folder
-            Directory.Delete(exportDirectory);
+            Directory.Delete(exportDirectory, true);
             MainClass.warehouseReloadRequested = true;
             MainClass.warehouseTargetFolder = modFolderDestination;
             MainClass.refreshInstalledModsRequested = true;
