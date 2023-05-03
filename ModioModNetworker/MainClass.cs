@@ -29,12 +29,13 @@ namespace ModioModNetworker
 
         public static List<string> subscribedModIoIds = new List<string>();
         private static List<string> toRemoveSubscribedModIoIds = new List<string>();
+        public static List<ModInfo> subscribedMods = new List<ModInfo>();
         public static List<ModInfo> installedMods = new List<ModInfo>();
         public static List<InstalledModInfo> InstalledModInfos = new List<InstalledModInfo>();
 
         public static bool warehouseReloadRequested = false;
-        public static string warehousePalletReloadTarget = "";
-        public static string warehouseTargetFolder = "";
+        public static List<string> warehousePalletReloadTargets = new List<string>();
+        public static List<string> warehouseReloadFolders = new List<string>();
         
         public static bool subsChanged = false;
         public static bool refreshInstalledModsRequested = false;
@@ -48,6 +49,11 @@ namespace ModioModNetworker
         
         private MelonPreferences_Category melonPreferencesCategory;
         private MelonPreferences_Entry<string> modsDirectory;
+        
+        private static int subsShown = 0;
+        private static int subTotal = 0;
+        
+        public bool palletLock = false;
 
         public override void OnInitializeMelon()
         {
@@ -84,19 +90,29 @@ namespace ModioModNetworker
             InstalledModInfos.Clear();
             PopulateInstalledMods(ModFileManager.MOD_FOLDER_PATH);
             MelonLogger.Msg("Checking mod.io account subscriptions");
-            ModFileManager.QueueSubscriptions();
+            PopulateSubscriptions();
             
             melonPreferencesCategory.SaveToFile();
         }
 
         public override void OnUpdate()
         {
+            if (ModFileManager.activeDownloadAction != null)
+            {
+                if (ModFileManager.activeDownloadAction.Check())
+                {
+                    ModFileManager.activeDownloadAction.Handle();
+                    ModFileManager.activeDownloadAction = null;
+                }
+            }
+
             if (!addedCallback)
             {
                 if (AssetWarehouse.Instance != null)
                 {
                     AssetWarehouse.Instance.OnCrateAdded += new Action<string>((s =>
                     {
+                        palletLock = false;
                         foreach (var playerRep in PlayerRepManager.PlayerReps)
                         {
                             // Use reflection to get the _isAvatarDirty bool from the playerRep
@@ -121,7 +137,6 @@ namespace ModioModNetworker
                     toRemoveSubscribedModIoIds.Clear();
                     ModlistMenu.Refresh(true);
                     subsRefreshing = false;
-                    ModFileManager.fetchingSubscriptions = false;
                     FusionNotifier.Send(new FusionNotification()
                     {
                         title = "Mod.io Subscriptions Refreshed!",
@@ -130,47 +145,53 @@ namespace ModioModNetworker
                         isMenuItem = false,
                         isPopup = true,
                     });
+                    MelonLogger.Msg("Finished refreshing mod.io subscriptions!");
                 }
             }
 
-            if (warehouseReloadRequested && AssetWarehouse.Instance != null)
+            if (warehouseReloadRequested && AssetWarehouse.Instance != null && AssetWarehouse.Instance._initialLoaded && !palletLock)
             {
                 bool update = false;
-                if (!warehousePalletReloadTarget.IsEmpty())
+                if (warehousePalletReloadTargets.Count > 0)
                 {
-                    AssetWarehouse.Instance.ReloadPallet(warehousePalletReloadTarget);
-                    warehouseTargetFolder = "";
-                    warehousePalletReloadTarget = "";
+                    AssetWarehouse.Instance.ReloadPallet(warehousePalletReloadTargets[0]);
+                    warehousePalletReloadTargets.RemoveAt(0);
                     update = true;
                 }
-                else if (!warehouseTargetFolder.IsEmpty())
+
+                if (warehouseReloadFolders.Count > 0)
                 {
-                    AssetWarehouse.Instance.LoadPalletFromFolderAsync(warehouseTargetFolder, true);
-                    warehouseTargetFolder = "";
-                    warehousePalletReloadTarget = "";
+                    AssetWarehouse.Instance.LoadPalletFromFolderAsync(warehouseReloadFolders[0], true);
+                    // Remove the first element from the list
+                    warehouseReloadFolders.RemoveAt(0);
+                    palletLock = true;
                 }
 
-                string reference = "Downloaded!";
-                string subtitle = "This mod has been loaded into the game.";
-                if (update)
+                if (warehouseReloadFolders.Count == 0 && warehousePalletReloadTargets.Count == 0)
                 {
-                    reference = "Updated!";
-                    subtitle = "This mod has been updated and reloaded.";
-                }
+                    string reference = "Downloaded!";
+                    string subtitle = "This mod has been loaded into the game.";
+                    if (update)
+                    {
+                        reference = "Updated!";
+                        subtitle = "This mod has been updated and reloaded.";
+                    }
 
-                FusionNotifier.Send(new FusionNotification()
-                {
-                    title = $"{ModlistMenu.activeDownloadModInfo.modId} {reference}",
-                    showTitleOnPopup = true,
-                    message = subtitle,
-                    popupLength = 3f,
-                    isMenuItem = false,
-                    isPopup = true,
-                });
+                    FusionNotifier.Send(new FusionNotification()
+                    {
+                        title = $"{ModlistMenu.activeDownloadModInfo.modId} {reference}",
+                        showTitleOnPopup = true,
+                        message = subtitle,
+                        popupLength = 3f,
+                        isMenuItem = false,
+                        isPopup = true,
+                    });
                 
-                warehouseReloadRequested = false;
-                ModFileManager.isDownloading = false;
-                ModlistMenu.activeDownloadModInfo = null;
+                    palletLock = false;
+                    warehouseReloadRequested = false;
+                    ModFileManager.isDownloading = false;
+                    ModlistMenu.activeDownloadModInfo = null;
+                }
             }
             
             ModInfo.HandleQueue();
@@ -195,6 +216,7 @@ namespace ModioModNetworker
             {
                 installedMods.Clear();
                 InstalledModInfos.Clear();
+                ModlistMenu.installPage = 0;
                 PopulateInstalledMods(ModFileManager.MOD_FOLDER_PATH);
                 ModlistMenu.Refresh(true);
                 refreshInstalledModsRequested = false;
@@ -202,7 +224,7 @@ namespace ModioModNetworker
 
             if (!subscriptionThreadString.IsEmpty())
             {
-                PopulateSubscriptions();
+                InternalPopulateSubscriptions();
             }
         }
 
@@ -215,17 +237,41 @@ namespace ModioModNetworker
 
             ModFileManager.AddToQueue(modInfo);
             subscribedModIoIds.Add(modInfo.modId);
+            subscribedMods.Add(modInfo);
         }
 
         public static void PopulateSubscriptions()
         {
+            subscribedMods.Clear();
             subscribedModIoIds.Clear();
+            subTotal = 0;
+            subsShown = 0;
+            desiredSubs = 0;
+            ModFileManager.QueueSubscriptions(subsShown);
+        }
 
+        private static void InternalPopulateSubscriptions()
+        {
             string json = subscriptionThreadString;
             subscriptionThreadString = "";
             JavaScriptSerializer serializer = new JavaScriptSerializer();
             var subs = serializer.Deserialize<dynamic>(json);
             int count = 0;
+            int resultTotal = subs["result_total"];
+            if (subTotal == 0)
+            {
+                MelonLogger.Msg("Total subscriptions: " + resultTotal);
+                subTotal = resultTotal;
+                desiredSubs = 0;
+            }
+
+            int resultCount = subs["result_count"];
+            if (resultCount == 0)
+            {
+                MelonLogger.Msg("No subscriptions found!");
+                return;
+            }
+            
             foreach (var sub in subs["data"])
             {
                 if (sub["game_id"] == 3809)
@@ -234,12 +280,12 @@ namespace ModioModNetworker
                 }
             }
             
-            desiredSubs = count;
-            subsRefreshing = true;
-            
+            desiredSubs += count;
+
             while (ModInfo.modInfoThreadRequests.TryDequeue(out var useless))
             {
             }
+
             ModInfo.requestSize = count;
             foreach (var sub in subs["data"])
             {
@@ -249,8 +295,63 @@ namespace ModioModNetworker
                     string modUrl = sub["profile_url"];
                     string[] split = modUrl.Split('/');
                     string name = split[split.Length - 1];
-                    ModInfo.RequestModInfo(name, "sub");
+                    bool valid = true;
+                    int windowsId = 0;
+                    int androidId = 0;
+                    foreach (var platform in sub["platforms"])
+                    {
+                        if (platform["platform"] == "windows")
+                        {
+                            int desired = platform["modfile_live"];
+                            windowsId = desired;
+                            break;
+                        }
+                    }
+
+                    foreach (var platform in sub["platforms"])
+                    {
+                        if (platform["platform"] == "android")
+                        {
+                            int desired = platform["modfile_live"];
+                            androidId = desired;
+                            break;
+                        }
+                    }
+
+                    if (windowsId != 0)
+                    {
+                        if (androidId != 0)
+                        {
+                            if (windowsId == androidId)
+                            {
+                                valid = false;
+                            }
+                        }
+                    }
+
+                    ModInfo modInfo = ModInfo.MakeFromDynamic(sub["modfile"], name);
+                    modInfo.isValidMod = false;
+
+                    if (valid)
+                    {
+                        modInfo.directDownloadLink = $"https://api.mod.io/v1/games/3809/mods/{sub["id"]}/files/{windowsId}/download";
+                        modInfo.isValidMod = true;
+                    }
+                    
+                    ReceiveSubModInfo(modInfo);
                 }
+            }
+            
+            subsShown += resultCount;
+
+            if (subTotal - subsShown > 0)
+            {
+                ModFileManager.QueueSubscriptions(subsShown);
+            }
+
+            if (subsShown >= subTotal)
+            {
+                subsRefreshing = true;
             }
         }
 
@@ -288,6 +389,14 @@ namespace ModioModNetworker
                     if (file.EndsWith("modinfo.json"))
                     {
                         var modInfo = serializer.Deserialize<ModInfo>(File.ReadAllText(file));
+                        foreach (var alreadyInstalled in installedMods)
+                        {
+                            if (alreadyInstalled.modId == modInfo.modId)
+                            {
+                                return;
+                            }
+                        }
+
                         installedMods.Add(modInfo);
                         InstalledModInfos.Add(new InstalledModInfo(){palletJsonPath = file, modId = modInfo.modId, palletBarcode = palletId});
                     }
@@ -316,9 +425,9 @@ namespace ModioModNetworker
         private void SendAllMods()
         {
             int index = 0;
-            foreach (string id in subscribedModIoIds)
+            foreach (ModInfo id in subscribedMods)
             {
-                bool final = index == subscribedModIoIds.Count - 1;
+                bool final = index == subscribedMods.Count - 1;
                 ModlistData modListData = ModlistData.Create(final, id);
                 using (var writer = FusionWriter.Create()) {
                     using (var data = modListData) {
@@ -357,7 +466,8 @@ namespace ModioModNetworker
                 sw.WriteLine("# At the bottom, you should see a section called 'OAuth Access'");
                 sw.WriteLine("# Create a key, call it whatever you'd like, this doesnt matter.");
                 sw.WriteLine("# Then create a token, call it whatever you'd like, this doesnt matter.");
-                sw.WriteLine("# Once you've created the token, copy it, and paste it in this file, replacing the text below.");
+                sw.WriteLine("# The token is pretty long, so make sure you copy the entire thing. Make sure you're copying the token, not the key.");
+                sw.WriteLine("# Once you've copied the token, paste it in this file, replacing the text labeled REPLACE_THIS_TEXT_WITH_YOUR_TOKEN.");
                 sw.WriteLine("AuthToken=REPLACE_THIS_TEXT_WITH_YOUR_TOKEN");
             }   
         }

@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using BoneLib;
+using LabFusion.Utilities;
 using MelonLoader;
 
 namespace ModioModNetworker.Data
@@ -21,14 +22,14 @@ namespace ModioModNetworker.Data
         public bool isValidMod;
         public bool downloading;
         public string modId;
-        public int fileSizeKB;
+        public float fileSizeKB;
         public string fileName;
         public string directDownloadLink;
         public double modDownloadPercentage;
         public string version = "0.0.0";
 
         private static Action onFinished;
-        public static int requestSize = 0;
+        public static float requestSize = 0;
         public static ConcurrentQueue<ModInfoThreadRequest> modInfoThreadRequests = new ConcurrentQueue<ModInfoThreadRequest>();
 
         public void Download()
@@ -40,7 +41,7 @@ namespace ModioModNetworker.Data
                     ModFileManager.isDownloading = true;
                     ModlistMenu.activeDownloadModInfo = this;
                     ModFileManager.downloadingModId = modId;
-                    ModFileManager.DownloadFile(directDownloadLink, MelonUtils.GameDirectory+"/"+modId+".zip");
+                    ModFileManager.DownloadFile(directDownloadLink, MelonUtils.GameDirectory+"\\temp.zip");
                 }
             }
         }
@@ -85,6 +86,22 @@ namespace ModioModNetworker.Data
             thread.Start();
         }
 
+        public static ModInfo MakeFromDynamic(dynamic mod, string modId)
+        {
+            ModInfo modInfo = new ModInfo();
+            modInfo.modId = modId;
+
+            modInfo.isValidMod = true;
+            modInfo.downloading = false;
+            
+            modInfo.fileSizeKB = mod["filesize"];
+            modInfo.fileName = mod["filename"];
+            modInfo.directDownloadLink = mod["download"]["binary_url"];
+            modInfo.version = mod["version"];
+
+            return modInfo;
+        }
+
         public static void Make(string modId, string json, string destination)
         {
             ModInfo modInfo = new ModInfo();
@@ -101,7 +118,7 @@ namespace ModioModNetworker.Data
             {
                 action = new Action<ModInfo>((info =>
                 {
-                    MainClass.ReceiveSubModInfo(info);
+                    
                 }));
             }
 

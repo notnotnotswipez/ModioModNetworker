@@ -14,8 +14,17 @@ namespace ModioModNetworker
         public static MenuCategory mainCategory;
         public static MenuCategory hostModsCategory;
         public static MenuCategory installedModsCategory;
+        public static MenuCategory managementCategory;
         private static string lastSelectedCategory;
         public static List<ModInfo> _modInfos = new List<ModInfo>();
+        
+        public static int installPage = 0;
+        public static int hostPage = 0;
+        
+        private static int installPageCount = 0;
+        private static int hostPageCount = 0;
+        
+        private static int modsPerPage = 4;
         
         public static ModInfo activeDownloadModInfo;
 
@@ -24,22 +33,13 @@ namespace ModioModNetworker
             mainCategory = MenuManager.CreateCategory("ModIo Mod Networker", Color.cyan);
             MainClass.menuRefreshRequested = true;
         }
-        
-        public static void PopulateModInfos(List<string> modIds)
+
+        public static void PopulateModInfos(List<ModInfo> modInfos)
         {
+            hostPage = 0;
             _modInfos.Clear();
-            while (ModInfo.modInfoThreadRequests.TryDequeue(out var useless))
-            {
-            }
-            ModInfo.requestSize = modIds.Count;
-            ModInfo.SetFinishedAction(() =>
-            {
-                MainClass.menuRefreshRequested = true;
-            });
-            foreach (var id in modIds)
-            {
-                ModInfo.RequestModInfo(id, "menuinfos");
-            }
+            _modInfos.AddRange(modInfos);
+            MainClass.menuRefreshRequested = true;
         }
 
         public static void Clear()
@@ -50,6 +50,8 @@ namespace ModioModNetworker
 
         public static void Refresh(bool openMenu)
         {
+            installPageCount = Mathf.CeilToInt(MainClass.installedMods.Count / (float) modsPerPage);
+            hostPageCount = Mathf.CeilToInt(_modInfos.Count / (float) modsPerPage);
             mainCategory.Elements.Clear();
 
             if (activeDownloadModInfo != null)
@@ -65,17 +67,20 @@ namespace ModioModNetworker
             
             mainCategory.CreateFunctionElement("Refresh Mod.Io Subscriptions", Color.cyan, () =>
             {
-                ModFileManager.QueueSubscriptions();
+                MainClass.PopulateSubscriptions();
             });
 
             installedModsCategory = mainCategory.CreateCategory("Installed Mods", Color.white);
-            CreateInstalledModsSection();
+            CreateInstalledModsSection(installPage);
             
             if (NetworkInfo.HasServer && !NetworkInfo.IsServer)
             {
                 hostModsCategory = mainCategory.CreateCategory("Host Mods", Color.white);
-                CreateHostModsSection();
+                CreateHostModsSection(hostPage);
             }
+            
+            managementCategory = mainCategory.CreateCategory("Management", Color.white);
+            CreateManagementSection();
 
             if (openMenu)
             {
@@ -84,17 +89,101 @@ namespace ModioModNetworker
             }
         }
 
-        private static void CreateInstalledModsSection()
+        private static void CreateManagementSection()
+        {
+            MenuCategory downloadingCategory = managementCategory.CreateCategory("Downloading", Color.white);
+            float totalSize = 0;
+            int missingMods = 0;
+            foreach (var modInfo in _modInfos)
+            {
+                bool isInstalled = false;
+                foreach (var mod in MainClass.installedMods)
+                {
+                    if (mod.modId == modInfo.modId)
+                    {
+                        isInstalled = true;
+                        break;
+                    }
+                }
+
+                if (!isInstalled)
+                {
+                    missingMods++;
+                    totalSize += modInfo.fileSizeKB;
+                }
+            }
+            
+            float kb = totalSize;
+            float mb = kb / 1000000;
+            float gb = mb / 1000;
+
+            string display = "KB";
+            float value = kb;
+            if (mb > 1)
+            {
+                value = mb;
+                display = "MB";
+            }
+            if (gb > 1)
+            {
+                value = gb;
+                display = "GB";
+            }
+            
+            // Round to 2 decimal places
+            value = Mathf.Round(value * 100f) / 100f;
+            downloadingCategory.CreateFunctionElement("Mods Missing: " + missingMods, Color.yellow, () => { });
+            
+            downloadingCategory.CreateFunctionElement($"Download All Host Mods ({value} {display})", Color.green, () =>
+            {
+                Refresh(true);
+                foreach (var modInfo in _modInfos)
+                {
+                    ModFileManager.AddToQueue(modInfo);
+                }
+            }, "Are you sure?");
+        }
+
+        private static void CreateInstalledModsSection(int page)
         {
             installedModsCategory.CreateSubPanel("INSTALLED", Color.green);
+            
+            int startIndex = page * modsPerPage;
+            int endIndex = Mathf.Min(startIndex + modsPerPage, MainClass.installedMods.Count);
 
+            int index = 0;
             foreach (var info in MainClass.installedMods)
             {
-                MakeModInfoButton(info, installedModsCategory, true);
+                if (index >= startIndex && index < endIndex)
+                {
+                    MakeModInfoButton(info, installedModsCategory, true);
+                }
+
+                index++;
+            }
+            
+            if (page > 0)
+            {
+                installedModsCategory.CreateFunctionElement($"Previous Page {page + 1}/{installPageCount}", Color.white, () =>
+                {
+                    installPage--;
+                    Refresh(false);
+                    MenuManager.SelectCategory(installedModsCategory);
+                });
+            }
+
+            if (page < installPageCount - 1)
+            {
+                installedModsCategory.CreateFunctionElement($"Next Page {page + 1}/{installPageCount}", Color.white, () =>
+                {
+                    installPage++;
+                    Refresh(false);
+                    MenuManager.SelectCategory(installedModsCategory);
+                });
             }
         }
 
-        private static void CreateHostModsSection()
+        private static void CreateHostModsSection(int page)
         {
             hostModsCategory.CreateSubPanel("HOST'S MODS", Color.white);
             
@@ -104,9 +193,40 @@ namespace ModioModNetworker
                 return;
             }
 
+            int startIndex = page * modsPerPage;
+
+            int index = 0;
+            int shown = 0;
+            
             foreach (var info in _modInfos)
             {
-                MakeModInfoButton(info, hostModsCategory);
+                if (index >= startIndex && shown < modsPerPage)
+                {
+                    MakeModInfoButton(info, hostModsCategory);
+                    shown++;
+                }
+
+                index++;
+            }
+            
+            if (page > 0)
+            {
+                hostModsCategory.CreateFunctionElement($"Previous Page {page + 1}/{hostPageCount}", Color.white, () =>
+                {
+                    hostPage--;
+                    Refresh(false);
+                    MenuManager.SelectCategory(hostModsCategory);
+                });
+            }
+
+            if (page < hostPageCount - 1)
+            {
+                hostModsCategory.CreateFunctionElement($"Next Page {page + 1}/{hostPageCount}", Color.white, () =>
+                {
+                    hostPage++;
+                    Refresh(false);
+                    MenuManager.SelectCategory(hostModsCategory);
+                });
             }
         }
 
@@ -141,12 +261,12 @@ namespace ModioModNetworker
             Color chosenColor = Color.white;
             
 
-            double kb = modInfo.fileSizeKB;
-            double mb = kb / 1000000;
-            double gb = mb / 1000;
+            float kb = modInfo.fileSizeKB;
+            float mb = kb / 1000000;
+            float gb = mb / 1000;
 
             string display = "KB";
-            double value = kb;
+            float value = kb;
             if (mb > 1)
             {
                 value = mb;
@@ -158,7 +278,7 @@ namespace ModioModNetworker
                 display = "GB";
             }
             
-            value = System.Math.Round(value, 2);
+            value = Mathf.Round(value * 100f) / 100f;
             
             ModInfo installedInfo = GetInstalledInfo(modInfo.modId);
             bool outOfDate = false;
