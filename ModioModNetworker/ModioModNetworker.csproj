@@ -34,6 +34,12 @@
     <Reference Include="0Harmony">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\0Harmony.dll</HintPath>
     </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\Managed\Assembly-CSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\Managed\Assembly-CSharp-firstpass.dll</HintPath>
+    </Reference>
     <Reference Include="BoneLib">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\Mods\BoneLib.dll</HintPath>
     </Reference>
@@ -468,8 +474,9 @@
     <Compile Include="MainClass.cs" />
     <Compile Include="ModFileManager.cs" />
     <Compile Include="ModlistMenu.cs" />
-    <Compile Include="ModlistMessage.cs" />
     <Compile Include="ModlistModule.cs" />
+    <Compile Include="Packets\ModlistMessage.cs" />
+    <Compile Include="Patches\AvatarSwitchPatch.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

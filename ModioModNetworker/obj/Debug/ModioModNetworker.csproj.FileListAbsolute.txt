@@ -175,3 +175,12 @@ D:\VisualStudioProjects\ModioModNetworker\ModioModNetworker\bin\Debug\System.IO.
 D:\VisualStudioProjects\ModioModNetworker\ModioModNetworker\bin\Debug\BoneLib.xml
 D:\VisualStudioProjects\ModioModNetworker\ModioModNetworker\bin\Debug\LabFusion.dll
 D:\VisualStudioProjects\ModioModNetworker\ModioModNetworker\bin\Debug\UniTask.Addressables.dll
+D:\VisualStudioProjects\ModioModNetworker\ModioModNetworker\bin\Debug\Assembly-CSharp-firstpass.dll
+D:\VisualStudioProjects\ModioModNetworker\ModioModNetworker\bin\Debug\Assembly-CSharp.dll
+D:\VisualStudioProjects\ModioModNetworker\ModioModNetworker\bin\Debug\ch.sycoforge.Decal.dll
+D:\VisualStudioProjects\ModioModNetworker\ModioModNetworker\bin\Debug\websocket-sharp.dll
+D:\VisualStudioProjects\ModioModNetworker\ModioModNetworker\bin\Debug\RayFireAssembly.dll
+D:\VisualStudioProjects\ModioModNetworker\ModioModNetworker\bin\Debug\Facepunch.Steamworks.Win64.dll
+D:\VisualStudioProjects\ModioModNetworker\ModioModNetworker\bin\Debug\NavMeshComponents.dll
+D:\VisualStudioProjects\ModioModNetworker\ModioModNetworker\bin\Debug\MeshBakerCore.dll
+D:\VisualStudioProjects\ModioModNetworker\ModioModNetworker\bin\Debug\RFLib_DotNet_2018.dll

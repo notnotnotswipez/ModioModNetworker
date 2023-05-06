@@ -100,12 +100,12 @@ namespace ModioModNetworker
             }
         }
 
-        public static void AddToQueue(ModInfo modInfo)
+        public static bool AddToQueue(ModInfo modInfo)
         {
             // Check if mod is in installed mods
             if (!modInfo.isValidMod)
             {
-                return;
+                return false;
             }
 
             bool isInstalled = false;
@@ -126,7 +126,7 @@ namespace ModioModNetworker
 
             if (isInstalled && !outdated)
             {
-                return;
+                return false;
             }
 
             // Check if mod is already in queue
@@ -134,12 +134,13 @@ namespace ModioModNetworker
             {
                 if (mod.modId == modInfo.modId)
                 {
-                    return;
+                    return false;
                 }
             }
 
             MelonLogger.Msg("Added: " + modInfo.modId + " to install queue");
             queue.Add(modInfo);
+            return true;
         }
 
         public static void DownloadFile(string url, string path)
@@ -224,25 +225,12 @@ namespace ModioModNetworker
 
         public static void UninstallAndUnsubscribe(string modId)
         {
-            InstalledModInfo installedModInfo = null;
-            foreach (var modInfo in MainClass.InstalledModInfos)
-            {
-                if (modInfo.modId == modId)
-                {
-                    installedModInfo = modInfo;
-                }
-            }
+            UnInstall(modId);
+            UnSubscribe(modId);
+        }
 
-            if (installedModInfo != null)
-            {
-                AssetWarehouse.Instance.UnloadPallet(installedModInfo.palletBarcode);
-                // Delete mod folder
-                string modJsonPath = installedModInfo.palletJsonPath;
-                // Get the directory containing the modinfo.json
-                string folder = modJsonPath.Replace("\\modinfo.json", "");
-                Directory.Delete(folder, true);
-            }
-
+        public static void UnSubscribe(string modId)
+        {
             string url = "https://api.mod.io/v1/games/3809/mods/@" + modId + "/subscribe";
 
             // Make https request to unsubscribe
@@ -264,7 +252,29 @@ namespace ModioModNetworker
                 MelonLogger.Error("Failed to unsubscribe from mod: " + modId);
                 MelonLogger.Error(e.Message);
             }
+        }
 
+        public static void UnInstall(string modId)
+        {
+            InstalledModInfo installedModInfo = null;
+            foreach (var modInfo in MainClass.InstalledModInfos)
+            {
+                if (modInfo.modId == modId)
+                {
+                    installedModInfo = modInfo;
+                }
+            }
+
+            if (installedModInfo != null)
+            {
+                AssetWarehouse.Instance.UnloadPallet(installedModInfo.palletBarcode);
+                // Delete mod folder
+                string modJsonPath = installedModInfo.modinfoJsonPath;
+                // Get the directory containing the modinfo.json
+                string folder = modJsonPath.Replace("\\modinfo.json", "");
+                Directory.Delete(folder, true);
+            }
+            
             MainClass.refreshInstalledModsRequested = true;
         }
 

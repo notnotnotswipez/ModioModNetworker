@@ -15,6 +15,7 @@ namespace ModioModNetworker
         public static MenuCategory hostModsCategory;
         public static MenuCategory installedModsCategory;
         public static MenuCategory managementCategory;
+        public static MenuCategory settingsCategory;
         private static string lastSelectedCategory;
         public static List<ModInfo> _modInfos = new List<ModInfo>();
         
@@ -81,6 +82,9 @@ namespace ModioModNetworker
             
             managementCategory = mainCategory.CreateCategory("Management", Color.white);
             CreateManagementSection();
+            
+            settingsCategory = mainCategory.CreateCategory("Settings", Color.white);
+            CreateSettingsSection();
 
             if (openMenu)
             {
@@ -89,9 +93,71 @@ namespace ModioModNetworker
             }
         }
 
+        private static void CreateSettingsSection()
+        {
+            Color desiredColor = Color.green;
+            if (!MainClass.autoDownloadAvatars)
+            {
+                desiredColor = Color.yellow;
+            }
+
+            settingsCategory.CreateBoolElement("Auto Download Avatars", desiredColor, MainClass.autoDownloadAvatars,
+                (b) =>
+                {
+                    MainClass.autoDownloadAvatars = b;
+                    Refresh(false);
+                    MenuManager.SelectCategory(settingsCategory);
+                    MainClass.autoDownloadAvatarsConfig.Value = b;
+                    MainClass.melonPreferencesCategory.SaveToFile();
+                });
+            settingsCategory.CreateSubPanel("==============", Color.white);
+            
+            settingsCategory.CreateIntElement("Auto Download Max MB", desiredColor, 500, 100, 200, 2000, 
+                (num) =>
+                {
+                    MainClass.maxAvatarMb = num;
+                    Refresh(false);
+                    MenuManager.SelectCategory(settingsCategory);
+                    MainClass.maxAutoDownloadMbConfig.Value = num;
+                    MainClass.melonPreferencesCategory.SaveToFile();
+                });
+            settingsCategory.CreateSubPanel("==============", Color.white);
+            
+            settingsCategory.CreateBoolElement("Auto Download 18+ Content", Color.red, MainClass.downloadMatureContent,
+                (b) =>
+                {
+                    MainClass.downloadMatureContent = b;
+                    Refresh(false);
+                    MenuManager.SelectCategory(settingsCategory);
+                    MainClass.downloadMatureContentConfig.Value = b;
+                    MainClass.melonPreferencesCategory.SaveToFile();
+                });
+        }
+
         private static void CreateManagementSection()
         {
             MenuCategory downloadingCategory = managementCategory.CreateCategory("Downloading", Color.white);
+            MenuCategory installedCategory = managementCategory.CreateCategory("Installed", Color.white);
+            
+            List<ModInfo> unSubscribedButInstalledMods = new List<ModInfo>();
+
+            foreach (var modInfos in MainClass.installedMods)
+            {
+                if (!modInfos.IsSubscribed())
+                {
+                    unSubscribedButInstalledMods.Add(modInfos);
+                }
+            }
+            
+            installedCategory.CreateFunctionElement($"Delete All Unsubscribed Mods ({unSubscribedButInstalledMods.Count} Mods)", Color.cyan, () =>
+            {
+                foreach (var mod in unSubscribedButInstalledMods)
+                {
+                    ModFileManager.UnInstall(mod.modId);
+                }
+                Refresh(true);
+            }, "Are you sure?");
+
             float totalSize = 0;
             int missingMods = 0;
             foreach (var modInfo in _modInfos)
@@ -308,6 +374,11 @@ namespace ModioModNetworker
             if (modInfo.isValidMod)
             {
                 modInfoButton.CreateSubPanel("Filename: "+modInfo.fileName, Color.yellow);
+                if (modInfo.mature)
+                {
+                    modInfoButton.CreateSubPanel("Mature Content", Color.red);
+                }
+
                 modInfoButton.CreateFunctionElement("File Size: "+value+" "+display, Color.yellow, ()=>{});
                 // We just got this from the API, so it should be up to date.
                 modInfoButton.CreateFunctionElement("Latest Version: "+modInfo.version, Color.yellow, ()=>{});

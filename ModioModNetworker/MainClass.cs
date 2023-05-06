@@ -33,6 +33,8 @@ namespace ModioModNetworker
         public static List<ModInfo> installedMods = new List<ModInfo>();
         public static List<InstalledModInfo> InstalledModInfos = new List<InstalledModInfo>();
 
+        private static List<InstalledModInfo> outOfDateModInfos = new List<InstalledModInfo>();
+
         public static bool warehouseReloadRequested = false;
         public static List<string> warehousePalletReloadTargets = new List<string>();
         public static List<string> warehouseReloadFolders = new List<string>();
@@ -47,13 +49,22 @@ namespace ModioModNetworker
 
         private bool addedCallback = false;
         
-        private MelonPreferences_Category melonPreferencesCategory;
-        private MelonPreferences_Entry<string> modsDirectory;
+        public static MelonPreferences_Category melonPreferencesCategory;
+        private static MelonPreferences_Entry<string> modsDirectory;
+        public static MelonPreferences_Entry<bool> autoDownloadAvatarsConfig;
+        public static MelonPreferences_Entry<bool> downloadMatureContentConfig;
+        public static MelonPreferences_Entry<float> maxAutoDownloadMbConfig;
+
+        public static float maxAvatarMb = 500f;
+        public static bool autoDownloadAvatars = true;
+        public static bool downloadMatureContent = false;
         
         private static int subsShown = 0;
         private static int subTotal = 0;
         
         public bool palletLock = false;
+
+        public static bool ignoreNextNotification = false;
 
         public override void OnInitializeMelon()
         {
@@ -62,6 +73,14 @@ namespace ModioModNetworker
             modsDirectory =
                 melonPreferencesCategory.CreateEntry<string>("ModDirectoryPath",
                     Application.persistentDataPath + "/Mods");
+            autoDownloadAvatarsConfig = melonPreferencesCategory.CreateEntry<bool>("AutoDownloadAvatars", true);
+            maxAutoDownloadMbConfig = melonPreferencesCategory.CreateEntry<float>("MaxAutoDownloadMb", 500f);
+            downloadMatureContentConfig = melonPreferencesCategory.CreateEntry<bool>("DownloadMatureContent", false);
+            
+            maxAvatarMb = maxAutoDownloadMbConfig.Value;
+            autoDownloadAvatars = autoDownloadAvatarsConfig.Value;
+            downloadMatureContent = downloadMatureContentConfig.Value;
+
             ModFileManager.MOD_FOLDER_PATH = modsDirectory.Value;
             PrepareModFiles();
             string auth = ReadAuthKey();
@@ -107,10 +126,10 @@ namespace ModioModNetworker
             }
 
             if (!addedCallback)
-            {
+            { 
                 if (AssetWarehouse.Instance != null)
                 {
-                    AssetWarehouse.Instance.OnCrateAdded += new Action<string>((s =>
+                    AssetWarehouse.Instance.OnCrateAdded += new Action<string>(s =>
                     {
                         palletLock = false;
                         foreach (var playerRep in PlayerRepManager.PlayerReps)
@@ -120,7 +139,7 @@ namespace ModioModNetworker
                             var isAvatarDirty = playerRep.GetType().GetField("_isAvatarDirty", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
                             isAvatarDirty.SetValue(playerRep, true);
                         }
-                    }));
+                    });
                     addedCallback = true;
                 }
             }
@@ -177,16 +196,24 @@ namespace ModioModNetworker
                         subtitle = "This mod has been updated and reloaded.";
                     }
 
-                    FusionNotifier.Send(new FusionNotification()
+                    if (!ignoreNextNotification)
                     {
-                        title = $"{ModlistMenu.activeDownloadModInfo.modId} {reference}",
-                        showTitleOnPopup = true,
-                        message = subtitle,
-                        popupLength = 3f,
-                        isMenuItem = false,
-                        isPopup = true,
-                    });
-                
+                        FusionNotifier.Send(new FusionNotification()
+                        {
+                            title = $"{ModlistMenu.activeDownloadModInfo.modId} {reference}",
+                            showTitleOnPopup = true,
+                            message = subtitle,
+                            popupLength = 3f,
+                            isMenuItem = false,
+                            isPopup = true,
+                        });
+                    }
+                    else
+                    {
+                        ignoreNextNotification = false;
+                    }
+
+
                     palletLock = false;
                     warehouseReloadRequested = false;
                     ModFileManager.isDownloading = false;
@@ -228,8 +255,38 @@ namespace ModioModNetworker
             }
         }
 
+        private static void UpdateModInfo(ModInfo subscribed, InstalledModInfo installed)
+        {
+            ModInfo original = installed.ModInfo;
+            original.mature = subscribed.mature;
+            original.structureVersion = ModInfo.globalStructureVersion;
+            string modInfoPath = installed.modinfoJsonPath;
+            // Delete the old modinfo.json
+            File.Delete(modInfoPath);
+            // Write the new modinfo.json
+            JavaScriptSerializer parser = new JavaScriptSerializer();
+            string modInfoJson = parser.Serialize(original);
+            File.WriteAllText(modInfoPath, modInfoJson);
+            MelonLogger.Msg($"Updated modinfo.json for {original.modId} to version {original.structureVersion}");
+        }
+
         public static void ReceiveSubModInfo(ModInfo modInfo)
         {
+            InstalledModInfo outOfDate = null;
+            foreach (var outOfDateInfo in outOfDateModInfos)
+            {
+                if (outOfDateInfo.modId == modInfo.modId)
+                {
+                    outOfDate = outOfDateInfo;
+                    UpdateModInfo(modInfo, outOfDateInfo);
+                }
+            }
+
+            if (outOfDate != null)
+            {
+                outOfDateModInfos.Remove(outOfDate);
+            }
+
             if (!modInfo.isValidMod)
             {
                 toRemoveSubscribedModIoIds.Add(modInfo.modId);
@@ -331,6 +388,7 @@ namespace ModioModNetworker
 
                     ModInfo modInfo = ModInfo.MakeFromDynamic(sub["modfile"], name);
                     modInfo.isValidMod = false;
+                    modInfo.mature = sub["maturity_option"] > 0;
 
                     if (valid)
                     {
@@ -389,6 +447,8 @@ namespace ModioModNetworker
                     if (file.EndsWith("modinfo.json"))
                     {
                         var modInfo = serializer.Deserialize<ModInfo>(File.ReadAllText(file));
+                        
+
                         foreach (var alreadyInstalled in installedMods)
                         {
                             if (alreadyInstalled.modId == modInfo.modId)
@@ -398,7 +458,19 @@ namespace ModioModNetworker
                         }
 
                         installedMods.Add(modInfo);
-                        InstalledModInfos.Add(new InstalledModInfo(){palletJsonPath = file, modId = modInfo.modId, palletBarcode = palletId});
+                        InstalledModInfo installedModInfo = new InstalledModInfo()
+                        {
+                            modinfoJsonPath = file, 
+                            modId = modInfo.modId, 
+                            palletBarcode = palletId, 
+                            ModInfo = modInfo
+                        };
+                        
+                        InstalledModInfos.Add(installedModInfo);
+                        if (modInfo.structureVersion < ModInfo.globalStructureVersion)
+                        {
+                            outOfDateModInfos.Add(installedModInfo);
+                        }
                     }
                 }
             }
@@ -411,6 +483,7 @@ namespace ModioModNetworker
 
         public void OnDisconnect()
         {
+            ModlistMessage.avatarMods.Clear();
             ModlistMenu.Clear();
         }
 
@@ -419,6 +492,25 @@ namespace ModioModNetworker
             if (NetworkInfo.HasServer && NetworkInfo.IsServer)
             {
                 SendAllMods();
+                SendAllAvatars();
+            }
+        }
+
+        private void SendAllAvatars()
+        {
+            foreach (var keyPair in ModlistMessage.avatarMods)
+            {
+                ModlistData avatarModData = ModlistData.Create(keyPair.Key, keyPair.Value);
+                using (var writer = FusionWriter.Create()) {
+                    using (var data = avatarModData) {
+                        writer.Write(data);
+                        using (var message = FusionMessage.ModuleCreate<ModlistMessage>(writer))
+                        {
+                            MelonLogger.Msg("Sending: "+keyPair.Value.modId);
+                            MessageSender.BroadcastMessageExcept(keyPair.Key, NetworkChannel.Reliable, message);
+                        }
+                    }
+                }
             }
         }
 

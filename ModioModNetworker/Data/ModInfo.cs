@@ -21,14 +21,17 @@ namespace ModioModNetworker.Data
     {
         public bool isValidMod;
         public bool downloading;
+        public bool mature;
         public string modId;
         public float fileSizeKB;
         public string fileName;
         public string directDownloadLink;
         public double modDownloadPercentage;
         public string version = "0.0.0";
+        public int structureVersion = 0;
 
         private static Action onFinished;
+        public static int globalStructureVersion = 1;
         public static float requestSize = 0;
         public static ConcurrentQueue<ModInfoThreadRequest> modInfoThreadRequests = new ConcurrentQueue<ModInfoThreadRequest>();
 
@@ -70,6 +73,21 @@ namespace ModioModNetworker.Data
             return MainClass.subscribedModIoIds.Contains(modId);
         }
 
+        public bool IsInstalled()
+        {
+            bool isInstalled = false;
+            foreach (var mod in MainClass.installedMods)
+            {
+                if (mod.modId == modId)
+                {
+                    isInstalled = true;
+                    break;
+                }
+            }
+
+            return isInstalled;
+        }
+
         public static void SetFinishedAction(Action action)
         {
             onFinished = action;
@@ -89,6 +107,7 @@ namespace ModioModNetworker.Data
         public static ModInfo MakeFromDynamic(dynamic mod, string modId)
         {
             ModInfo modInfo = new ModInfo();
+            modInfo.structureVersion = globalStructureVersion;
             modInfo.modId = modId;
 
             modInfo.isValidMod = true;
@@ -105,6 +124,7 @@ namespace ModioModNetworker.Data
         public static void Make(string modId, string json, string destination)
         {
             ModInfo modInfo = new ModInfo();
+            modInfo.structureVersion = globalStructureVersion;
             modInfo.modId = modId;
             Action<ModInfo> action;
             if (destination == "menuinfos")
