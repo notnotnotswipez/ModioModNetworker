@@ -29,13 +29,14 @@ namespace ModioModNetworker.Data
         public double modDownloadPercentage;
         public string version = "0.0.0";
         public int structureVersion = 0;
+        public bool temp = false;
 
         private static Action onFinished;
         public static int globalStructureVersion = 1;
         public static float requestSize = 0;
         public static ConcurrentQueue<ModInfoThreadRequest> modInfoThreadRequests = new ConcurrentQueue<ModInfoThreadRequest>();
 
-        public void Download()
+        public bool Download()
         {
             if (isValidMod)
             {
@@ -44,9 +45,12 @@ namespace ModioModNetworker.Data
                     ModFileManager.isDownloading = true;
                     ModlistMenu.activeDownloadModInfo = this;
                     ModFileManager.downloadingModId = modId;
-                    ModFileManager.DownloadFile(directDownloadLink, MelonUtils.GameDirectory+"\\temp.zip");
+                    ModFileManager.DownloadFile(directDownloadLink, MelonUtils.GameDirectory + "\\temp.zip");
+                    return true;
                 }
             }
+
+            return false;
         }
 
         public static void HandleQueue()

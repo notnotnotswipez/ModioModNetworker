@@ -471,13 +471,26 @@
   <ItemGroup>
     <Compile Include="Data\InstalledModInfo.cs" />
     <Compile Include="Data\ModInfo.cs" />
+    <Compile Include="Data\SerializedModInfo.cs" />
     <Compile Include="MainClass.cs" />
     <Compile Include="ModFileManager.cs" />
     <Compile Include="ModlistMenu.cs" />
     <Compile Include="ModlistModule.cs" />
     <Compile Include="Packets\ModlistMessage.cs" />
     <Compile Include="Patches\AvatarSwitchPatch.cs" />
+    <Compile Include="Patches\LevelLoadPatch.cs" />
+    <Compile Include="Patches\PooleeSpawnPatch.cs" />
+    <Compile Include="Patches\SpawnableResponsePatch.cs" />
+    <Compile Include="Patches\SyncableCleanupPatch.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Queue\LevelHoldQueue.cs" />
+    <Compile Include="Queue\SpawnableHoldQueue.cs" />
+    <Compile Include="UI\AvatarDownloadBar.cs" />
+    <Compile Include="Utilities\ModInfoUtilities.cs" />
+    <Compile Include="Utilities\ResourceHelpers.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\networker.assets" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

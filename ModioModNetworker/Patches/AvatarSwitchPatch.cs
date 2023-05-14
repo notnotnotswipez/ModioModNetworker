@@ -16,7 +16,7 @@ namespace ModioModNetworker.Patches
         {
             public static void Postfix()
             {
-                if (NetworkInfo.HasServer)
+                if (NetworkInfo.HasServer && MainClass.confirmedHostHasIt)
                 {
                     ModInfo avatarModInfo = null;
                     foreach (var installedModInfo in MainClass.InstalledModInfos)
@@ -41,10 +41,11 @@ namespace ModioModNetworker.Patches
                     if (avatarModInfo != null)
                     {
                         using (var writer = FusionWriter.Create()) {
-                            using (var data = ModlistData.Create(PlayerIdManager.LocalId, avatarModInfo)) {
+                            using (var data = ModlistData.Create(PlayerIdManager.LocalId, avatarModInfo, ModlistData.ModType.AVATAR)) {
                                 writer.Write(data);
                                 using (var message = FusionMessage.ModuleCreate<ModlistMessage>(writer))
                                 {
+                                    MelonLogger.Msg("Sending avatar mod info to server");
                                     MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
                                 }
                             }

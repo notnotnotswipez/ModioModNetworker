@@ -40,7 +40,8 @@ namespace ModioModNetworker
             hostPage = 0;
             _modInfos.Clear();
             _modInfos.AddRange(modInfos);
-            MainClass.menuRefreshRequested = true;
+            MainClass.confirmedHostHasIt = true;
+            Refresh(false);
         }
 
         public static void Clear()
@@ -61,6 +62,10 @@ namespace ModioModNetworker
                 mainCategory.CreateFunctionElement("Click to Update Percentage", Color.white, () =>
                 {
                     Refresh(true);
+                });
+                mainCategory.CreateFunctionElement("Click to Cancel Download", Color.red, () =>
+                {
+                    ModFileManager.StopDownload();
                 });
                 mainCategory.CreateFunctionElement(activeDownloadModInfo.modId+$" ({activeDownloadModInfo.modDownloadPercentage}%)", Color.yellow, () => { });
                 mainCategory.CreateSubPanel("==============", Color.yellow);
@@ -100,25 +105,68 @@ namespace ModioModNetworker
             {
                 desiredColor = Color.yellow;
             }
+            
+            Color desiredColorSpawnable = Color.green;
+            if (!MainClass.autoDownloadSpawnables)
+            {
+                desiredColorSpawnable = Color.yellow;
+            }
+            
+            Color desiredColorLevel = Color.green;
+            if (!MainClass.autoDownloadLevels)
+            {
+                desiredColorLevel = Color.yellow;
+            }
+            settingsCategory.CreateBoolElement("Auto Delete Lobby Mods", Color.yellow, MainClass.tempLobbyMods,
+                (b) =>
+                {
+                    MainClass.tempLobbyMods = b;
+                    MainClass.tempLobbyModsConfig.Value = b;
+                    MainClass.melonPreferencesCategory.SaveToFile();
+                });
+            settingsCategory.CreateSubPanel("==============", Color.white);
 
             settingsCategory.CreateBoolElement("Auto Download Avatars", desiredColor, MainClass.autoDownloadAvatars,
                 (b) =>
                 {
                     MainClass.autoDownloadAvatars = b;
-                    Refresh(false);
-                    MenuManager.SelectCategory(settingsCategory);
                     MainClass.autoDownloadAvatarsConfig.Value = b;
                     MainClass.melonPreferencesCategory.SaveToFile();
                 });
             settingsCategory.CreateSubPanel("==============", Color.white);
             
-            settingsCategory.CreateIntElement("Auto Download Max MB", desiredColor, 500, 100, 200, 2000, 
+            settingsCategory.CreateBoolElement("Auto Download Spawnables", desiredColorSpawnable, MainClass.autoDownloadSpawnables,
+                (b) =>
+                {
+                    MainClass.autoDownloadSpawnables = b;
+                    MainClass.autoDownloadSpawnablesConfig.Value = b;
+                    MainClass.melonPreferencesCategory.SaveToFile();
+                });
+            settingsCategory.CreateSubPanel("==============", Color.white);
+            
+            settingsCategory.CreateBoolElement("Auto Download Levels", desiredColorLevel, MainClass.autoDownloadLevels,
+                (b) =>
+                {
+                    MainClass.autoDownloadLevels = b;
+                    MainClass.autoDownloadLevelsConfig.Value = b;
+                    MainClass.melonPreferencesCategory.SaveToFile();
+                });
+            settingsCategory.CreateSubPanel("==============", Color.white);
+            
+            settingsCategory.CreateIntElement("(Spawnable/Avatar) Auto Download Max MB", Color.cyan, (int) MainClass.maxAutoDownloadMb, 100, 200, 2000, 
                 (num) =>
                 {
-                    MainClass.maxAvatarMb = num;
-                    Refresh(false);
-                    MenuManager.SelectCategory(settingsCategory);
+                    MainClass.maxAutoDownloadMb = num;
                     MainClass.maxAutoDownloadMbConfig.Value = num;
+                    MainClass.melonPreferencesCategory.SaveToFile();
+                });
+            settingsCategory.CreateSubPanel("==============", Color.white);
+            
+            settingsCategory.CreateIntElement("(Level) Auto Download Max GB", Color.cyan, (int) MainClass.levelMaxGb, 1, 1, 10, 
+                (num) =>
+                {
+                    MainClass.levelMaxGb = num;
+                    MainClass.maxLevelAutoDownloadGbConfig.Value = num;
                     MainClass.melonPreferencesCategory.SaveToFile();
                 });
             settingsCategory.CreateSubPanel("==============", Color.white);
@@ -127,8 +175,6 @@ namespace ModioModNetworker
                 (b) =>
                 {
                     MainClass.downloadMatureContent = b;
-                    Refresh(false);
-                    MenuManager.SelectCategory(settingsCategory);
                     MainClass.downloadMatureContentConfig.Value = b;
                     MainClass.melonPreferencesCategory.SaveToFile();
                 });
@@ -205,7 +251,11 @@ namespace ModioModNetworker
                 Refresh(true);
                 foreach (var modInfo in _modInfos)
                 {
-                    ModFileManager.AddToQueue(modInfo);
+                    ModFileManager.AddToQueue(new DownloadQueueElement()
+                    {
+                        associatedPlayer = null,
+                        info = modInfo
+                    });
                 }
             }, "Are you sure?");
         }

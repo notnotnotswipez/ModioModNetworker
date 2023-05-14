@@ -7,22 +7,24 @@ using LabFusion.Representation;
 using LabFusion.Utilities;
 using MelonLoader;
 using ModioModNetworker.Data;
+using SLZ.Marrow.SceneStreaming;
 
 namespace ModioModNetworker
 {
     public class ModlistData : IFusionSerializable, IDisposable
     {
-        public bool forPlayer = false;
+        public enum ModType {
+            LIST = 1,
+            AVATAR = 2,
+            SPAWNABLE = 3,
+            LEVEL = 4,
+        }
+        
         public PlayerId playerId;
         public bool isFinal = false;
-        public bool valid = false;
-        public bool mature = false;
-        public ModInfo modInfo;
-        private float fileSize;
-        private string downloadLink;
-        private string modId;
-        private string versionNumber;
-
+        public ModType modType = ModType.LIST;
+        public SerializedModInfo serializedModInfo;
+        
         public void Dispose()
         {
             GC.SuppressFinalize(this);
@@ -31,42 +33,17 @@ namespace ModioModNetworker
         public void Serialize(FusionWriter writer)
         {
             writer.Write(isFinal);
-            writer.Write(forPlayer);
-            writer.Write(mature);
+            writer.Write((byte)modType);
             writer.Write(playerId.SmallId);
-            writer.Write(valid);
-            writer.Write(fileSize);
-            string built = "";
-            built += modId + GameObjectUtilities.PathSeparator;
-            built += versionNumber + GameObjectUtilities.PathSeparator;
-            built += downloadLink;
-            writer.Write(built);
+            writer.Write(serializedModInfo);
         }
 
         public void Deserialize(FusionReader reader)
         {
             isFinal = reader.ReadBoolean();
-            forPlayer = reader.ReadBoolean();
-            mature = reader.ReadBoolean();
+            modType = (ModType)reader.ReadByte();
             playerId = PlayerIdManager.GetPlayerId(reader.ReadByte());
-            valid = reader.ReadBoolean();
-            fileSize = reader.ReadSingle();
-            string received = reader.ReadString();
-            string[] split = received.Split(GameObjectUtilities.PathSeparator);
-            modId = split[0];
-            versionNumber = split[1];
-            downloadLink = split[2];
-            modInfo = new ModInfo
-            {
-                structureVersion = ModInfo.globalStructureVersion,
-                isValidMod = valid,
-                modId = modId,
-                mature = mature,
-                version = versionNumber,
-                directDownloadLink = downloadLink,
-                fileSizeKB = fileSize,
-                fileName = modId+".zip"
-            };
+            serializedModInfo = reader.ReadFusionSerializable<SerializedModInfo>();
         }
 
         public static ModlistData Create(bool final, ModInfo info)
@@ -75,31 +52,21 @@ namespace ModioModNetworker
             return new ModlistData()
             {
                 isFinal = final,
-                forPlayer = false,
-                modId = info.modId,
-                mature = info.mature,
                 playerId = PlayerIdManager.LocalId,
-                versionNumber = info.version,
-                downloadLink = info.directDownloadLink,
-                fileSize = info.fileSizeKB,
-                valid = info.isValidMod
+                modType = ModType.LIST,
+                serializedModInfo = SerializedModInfo.Create(info)
             };
         }
         
-        public static ModlistData Create(PlayerId playerId, ModInfo info)
+        public static ModlistData Create(PlayerId playerId, ModInfo info, ModType infoType)
         {
 
             return new ModlistData()
             {
                 isFinal = false,
-                forPlayer = true,
+                modType = infoType,
                 playerId = playerId,
-                modId = info.modId,
-                mature = info.mature,
-                versionNumber = info.version,
-                downloadLink = info.directDownloadLink,
-                fileSize = info.fileSizeKB,
-                valid = info.isValidMod
+                serializedModInfo = SerializedModInfo.Create(info)
             };
         }
     }
@@ -108,6 +75,7 @@ namespace ModioModNetworker
     {
         private static List<ModInfo> modlist = new List<ModInfo>();
         public static Dictionary<PlayerId, ModInfo> avatarMods = new Dictionary<PlayerId, ModInfo>();
+        public static List<ModInfo> waitAndQueue = new List<ModInfo>();
 
         public override void HandleMessage(byte[] bytes, bool isServerHandled = false)
         {
@@ -117,7 +85,7 @@ namespace ModioModNetworker
                 {
                     if (NetworkInfo.IsServer && isServerHandled)
                     {
-                        if (data.forPlayer)
+                        if (data.modType != ModlistData.ModType.LIST)
                         {
                             using (var message = FusionMessage.ModuleCreate<ModlistMessage>(bytes))
                             {
@@ -132,33 +100,106 @@ namespace ModioModNetworker
 
                     if (data != null)
                     {
-                        ModInfo modInfo = data.modInfo;
-                        if (data.forPlayer)
+                        ModInfo modInfo = data.serializedModInfo.modInfo;
+                        if (data.modType != ModlistData.ModType.LIST)
                         {
                             if (modInfo.isValidMod)
                             {
-                                float mb = modInfo.fileSizeKB / 1000000;
-                                if (mb < MainClass.maxAvatarMb && MainClass.autoDownloadAvatars)
+                                switch (data.modType)
                                 {
-                                    if (!MainClass.downloadMatureContent && modInfo.mature)
+                                    case ModlistData.ModType.AVATAR:
                                     {
-                                        return;
-                                    }
+                                        if (!avatarMods.ContainsKey(data.playerId))
+                                        {
+                                            avatarMods.Add(data.playerId, modInfo);
+                                        }
+                                        else
+                                        {
+                                            avatarMods[data.playerId] = modInfo;
+                                        }
+                                
+                                        if (SceneStreamer._session != null)
+                                        {
+                                            if (SceneStreamer._session.Status == StreamStatus.LOADING)
+                                            {
+                                                waitAndQueue.Add(modInfo);
+                                                return;
+                                            }
+                                        }
 
-                                    if (ModFileManager.AddToQueue(modInfo))
+                                        float mb = modInfo.fileSizeKB / 1000000;
+                                        if (mb < MainClass.maxAutoDownloadMb && MainClass.autoDownloadAvatars)
+                                        {
+                                            if (!MainClass.downloadMatureContent && modInfo.mature)
+                                            {
+                                                return;
+                                            }
+                                            
+                                            if (MainClass.tempLobbyMods)
+                                            {
+                                                modInfo.temp = true;
+                                            }
+
+                                            ModFileManager.AddToQueue(new DownloadQueueElement()
+                                            {
+                                                associatedPlayer = data.playerId,
+                                                info = modInfo,
+                                                notify = false
+                                            });
+                                        }
+                                        break;
+                                    }
+                                    case ModlistData.ModType.SPAWNABLE:
                                     {
-                                        // Its kinda annoying to see this message every time you download an avatar, theres a reason why VRChat doesn't do this :)
-                                        MainClass.ignoreNextNotification = true;
-                                    }
-                                }
+                                        float mb = modInfo.fileSizeKB / 1000000;
+                        
+                                        if (MainClass.autoDownloadSpawnables && mb < MainClass.maxAutoDownloadMb)
+                                        {
+                                            if (!MainClass.downloadMatureContent && modInfo.mature)
+                                            {
+                                                return;
+                                            }
+                                            
+                                            if (MainClass.tempLobbyMods)
+                                            {
+                                                modInfo.temp = true;
+                                            }
+                            
+                                            ModFileManager.AddToQueue(new DownloadQueueElement()
+                                            {
+                                                associatedPlayer = null,
+                                                info = modInfo,
+                                            });
+                                        }
 
-                                if (!avatarMods.ContainsKey(data.playerId))
-                                {
-                                    avatarMods.Add(data.playerId, modInfo);
-                                }
-                                else
-                                {
-                                    avatarMods[data.playerId] = modInfo;
+                                        break;
+                                    }
+                                    case ModlistData.ModType.LEVEL:
+                                    {
+                                        float mb = modInfo.fileSizeKB / 1000000;
+                                        float gb = mb / 1000;
+                        
+                                        if (MainClass.autoDownloadLevels && gb < MainClass.levelMaxGb)
+                                        {
+                                            if (!MainClass.downloadMatureContent && modInfo.mature)
+                                            {
+                                                return;
+                                            }
+
+                                            if (MainClass.tempLobbyMods)
+                                            {
+                                                modInfo.temp = true;
+                                            }
+
+                                            ModFileManager.AddToQueue(new DownloadQueueElement()
+                                            {
+                                                associatedPlayer = null,
+                                                info = modInfo,
+                                            });
+                                        }
+
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -166,7 +207,7 @@ namespace ModioModNetworker
                         {
                             if (modInfo.isValidMod)
                             {
-                                modlist.Add(data.modInfo);
+                                modlist.Add(modInfo);
                             }
                             if (data.isFinal)
                             {
