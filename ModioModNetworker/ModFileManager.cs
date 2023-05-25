@@ -167,6 +167,11 @@ namespace ModioModNetworker
                     return false;
                 }
             }
+            
+            if (modInfo.version == null)
+            {
+                modInfo.version = "0.0.0";
+            }
 
             bool isInstalled = false;
             bool outdated = false;

@@ -19,15 +19,18 @@ namespace ModioModNetworker.Patches
             
             public static void Prefix(AssetPoolee __instance)
             {
-                ModInfo installedModInfo = ModInfoUtilities.GetModInfoForPoolee(__instance);
-                if (installedModInfo != null)
+                if (MainClass.confirmedHostHasIt && NetworkInfo.HasServer)
                 {
-                    using (var writer = FusionWriter.Create()) {
-                        using (var data = ModlistData.Create(PlayerIdManager.LocalId, installedModInfo, ModlistData.ModType.SPAWNABLE)) {
-                            writer.Write(data);
-                            using (var message = FusionMessage.ModuleCreate<ModlistMessage>(writer))
-                            {
-                                MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
+                    ModInfo installedModInfo = ModInfoUtilities.GetModInfoForPoolee(__instance);
+                    if (installedModInfo != null)
+                    {
+                        using (var writer = FusionWriter.Create()) {
+                            using (var data = ModlistData.Create(PlayerIdManager.LocalId, installedModInfo, ModlistData.ModType.SPAWNABLE)) {
+                                writer.Write(data);
+                                using (var message = FusionMessage.ModuleCreate<ModlistMessage>(writer))
+                                {
+                                    MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
+                                }
                             }
                         }
                     }

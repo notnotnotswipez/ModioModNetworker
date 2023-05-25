@@ -229,7 +229,7 @@ namespace ModioModNetworker
                     subsRefreshing = false;
                     FusionNotifier.Send(new FusionNotification()
                     {
-                        title = "Mod.io Subscriptions Refreshed!",
+                        title = new NotificationText("Mod.io Subscriptions Refreshed!", Color.cyan, true),
                         showTitleOnPopup = true,
                         popupLength = 1f,
                         isMenuItem = false,
@@ -271,9 +271,9 @@ namespace ModioModNetworker
                     {
                         FusionNotifier.Send(new FusionNotification()
                         {
-                            title = $"{ModlistMenu.activeDownloadModInfo.modId} {reference}",
+                            title = new NotificationText($"{ModlistMenu.activeDownloadModInfo.modId} {reference}", Color.cyan, true),
                             showTitleOnPopup = true,
-                            message = subtitle,
+                            message = new NotificationText(subtitle),
                             popupLength = 3f,
                             isMenuItem = false,
                             isPopup = true,
@@ -370,6 +370,10 @@ namespace ModioModNetworker
             ModInfo original = installed.ModInfo;
             original.mature = subscribed.mature;
             original.structureVersion = ModInfo.globalStructureVersion;
+            if (original.version == null)
+            {
+                original.version = "0.0.0";
+            }
             string modInfoPath = installed.modinfoJsonPath;
             // Delete the old modinfo.json
             File.Delete(modInfoPath);
@@ -383,6 +387,11 @@ namespace ModioModNetworker
         public static void ReceiveSubModInfo(ModInfo modInfo)
         {
             InstalledModInfo outOfDate = null;
+            if (modInfo.version == null)
+            {
+                modInfo.version = "0.0.0";
+            }
+
             foreach (var outOfDateInfo in outOfDateModInfos)
             {
                 if (outOfDateInfo.modId == modInfo.modId)
@@ -498,6 +507,11 @@ namespace ModioModNetworker
                                 valid = false;
                             }
                         }
+                    }
+                    
+                    if (sub["status"] == 3)
+                    {
+                        valid = false;
                     }
 
                     ModInfo modInfo = ModInfo.MakeFromDynamic(sub["modfile"], name);

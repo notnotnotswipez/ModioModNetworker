@@ -38,8 +38,8 @@ namespace ModioModNetworker.Queue
             MelonLogger.Msg("Barcode: " + data.missingBarcode);
             FusionNotifier.Send(new FusionNotification()
             {
-                title = $"The host tried loading a level you dont have. \"{data.missingBarcode}\"",
-                message = "Wait a bit, it may start downloading!",
+                title = new NotificationText($"The host tried loading a level you dont have. \"{data.missingBarcode}\""),
+                message = new NotificationText("Wait a bit, it may start downloading!"),
                 showTitleOnPopup = true,
                 popupLength = 3f,
                 isMenuItem = false,

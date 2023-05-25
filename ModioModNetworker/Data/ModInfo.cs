@@ -206,6 +206,10 @@ namespace ModioModNetworker.Data
                     modInfo.directDownloadLink = foundMod["download"]["binary_url"];
                     modInfo.fileName = foundMod["filename"];
                     modInfo.version = foundMod["version"];
+                    if (modInfo.version == null)
+                    {
+                        modInfo.version = "0.0.0";
+                    }
                 }
                 else
                 {

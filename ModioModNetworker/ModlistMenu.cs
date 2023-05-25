@@ -482,12 +482,12 @@ namespace ModioModNetworker
                                 Refresh(true);
                                 FusionNotifier.Send(new FusionNotification()
                                 {
-                                    title = "Subscribed to "+modInfo.modId,
+                                    title = new NotificationText("Subscribed to "+modInfo.modId),
                                     showTitleOnPopup = true,
-                                    message = "This is now in your mod.io subscribed list.",
+                                    message = new NotificationText("This is now in your mod.io subscribed list."),
                                     popupLength = 3f,
                                     isMenuItem = false,
-                                    isPopup = true,
+                                    isPopup = true
                                 });
                             }
                         });

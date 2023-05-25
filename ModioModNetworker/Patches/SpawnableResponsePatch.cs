@@ -1,6 +1,7 @@
 using HarmonyLib;
 using LabFusion.Network;
 using MelonLoader;
+using ModioModNetworker.Data;
 using ModioModNetworker.Queue;
 using ModioModNetworker.Utilities;
 using SLZ.Marrow.Warehouse;
@@ -14,7 +15,7 @@ namespace ModioModNetworker.Patches
         {
             public static bool Prefix(byte[] bytes, bool isServerHandled = false)
             {
-                if (!isServerHandled)
+                if (!isServerHandled && MainClass.autoDownloadSpawnables && MainClass.confirmedHostHasIt)
                 {
                     using (var reader = FusionReader.Create(bytes))
                     {
@@ -22,7 +23,6 @@ namespace ModioModNetworker.Patches
                         {
                             if (!IsCrate(data.barcode))
                             {
-                                MelonLogger.Msg("SpawnableResponsePatch: Adding to queue");
                                 SpawnableHoldQueue.AddToQueue(new SpawnableHoldQueueData()
                                 {
                                     missingBarcode = data.barcode,
@@ -33,7 +33,6 @@ namespace ModioModNetworker.Patches
                             
                             if (LevelHoldQueue.LevelInQueue())
                             {
-                                MelonLogger.Msg("SpawnableResponsePatch: Level in queue, stalling spawnable");
                                 SpawnableHoldQueue.AddToQueue(data);
                                 return false;
                             }

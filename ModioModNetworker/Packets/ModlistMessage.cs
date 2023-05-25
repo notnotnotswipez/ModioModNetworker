@@ -135,6 +135,11 @@ namespace ModioModNetworker
                                                 return;
                                             }
                                             
+                                            if (modInfo.IsSubscribed())
+                                            {
+                                                return;
+                                            }
+                                            
                                             if (MainClass.tempLobbyMods)
                                             {
                                                 modInfo.temp = true;
@@ -159,7 +164,12 @@ namespace ModioModNetworker
                                             {
                                                 return;
                                             }
-                                            
+
+                                            if (modInfo.IsSubscribed())
+                                            {
+                                                return;
+                                            }
+
                                             if (MainClass.tempLobbyMods)
                                             {
                                                 modInfo.temp = true;
