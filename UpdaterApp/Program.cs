@@ -23,13 +23,13 @@ namespace UpdaterApp
             try
             {
                 Version localVersion = new Version(args[0]);
-                string fusionAssemblyPath = args[1];
-                string fusionUpdaterAssemblyPath = args[2];
+                string networkerAssemblyPath = args[1];
+                string networkerUpdaterAssemblyPath = args[2];
                 bool updatePlugin = args[3] == "true";
 
                 using (HttpClient client = new HttpClient())
                 {
-                    // Web request for getting all versions of LabFusion from github API
+                    // Web request for getting all versions of ModioModNetworker from github API
                     HttpWebRequest request = (HttpWebRequest)WebRequest.Create(_releasesApi);
                     request.Accept = "application/vnd.github.v3.raw";
                     request.UserAgent = PluginName;
@@ -70,14 +70,14 @@ namespace UpdaterApp
                                         string downloadUrl = asset["browser_download_url"];
                                         using (HttpClient downloadClient = new HttpClient())
                                         {
-                                            // Download the latest version of LabFusion.dll and save it to the mods folder
+                                            // Download the latest version of ModioModNetworker.dll and save it to the mods folder
                                             HttpWebRequest downloadRequest = (HttpWebRequest)WebRequest.Create(downloadUrl);
                                             downloadRequest.Accept = "application/vnd.github.v3.raw";
                                             downloadRequest.UserAgent = PluginName;
                                             WebResponse downloadResponse = downloadRequest.GetResponse();
                                             using (Stream downloadStream = downloadResponse.GetResponseStream())
                                             {
-                                                using (FileStream fileStream = new FileStream(fusionAssemblyPath, FileMode.Create, FileAccess.Write))
+                                                using (FileStream fileStream = new FileStream(networkerAssemblyPath, FileMode.Create, FileAccess.Write))
                                                 {
                                                     downloadStream.CopyTo(fileStream);
                                                     downloadedMod = true;
@@ -113,7 +113,7 @@ namespace UpdaterApp
                                         WebResponse downloadResponse = downloadRequest.GetResponse();
                                         using (Stream downloadStream = downloadResponse.GetResponseStream())
                                         {
-                                            using (FileStream fileStream = new FileStream(fusionUpdaterAssemblyPath, FileMode.Create, FileAccess.Write))
+                                            using (FileStream fileStream = new FileStream(networkerUpdaterAssemblyPath, FileMode.Create, FileAccess.Write))
                                             {
                                                 downloadStream.CopyTo(fileStream);
                                                 Console.WriteLine($"Successfully updated {PluginName}{AssemblyExtension}!");
