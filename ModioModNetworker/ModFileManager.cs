@@ -160,6 +160,11 @@ namespace ModioModNetworker
                 return false;
             }
 
+            if (MainClass.blacklistedModIoIds.Contains(modInfo.modId))
+            {
+                return false;
+            }
+
             if (activeDownloadQueueElement != null)
             {
                 if (activeDownloadQueueElement.info.modId == modInfo.modId)

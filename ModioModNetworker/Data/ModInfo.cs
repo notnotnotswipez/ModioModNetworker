@@ -191,7 +191,7 @@ namespace ModioModNetworker.Data
 
                     if (!validMod) continue;
 
-                    string modVersion = mod["version"];
+                    string modVersion = "" + mod["version"];
                     // Compare versions x.x.x
                     if (modVersion.CompareTo(prevVersion) > 0 || foundMod == null)
                     {
@@ -205,7 +205,7 @@ namespace ModioModNetworker.Data
                     modInfo.fileSizeKB = foundMod["filesize"];
                     modInfo.directDownloadLink = foundMod["download"]["binary_url"];
                     modInfo.fileName = foundMod["filename"];
-                    modInfo.version = foundMod["version"];
+                    modInfo.version = ""+foundMod["version"];
                     if (modInfo.version == null)
                     {
                         modInfo.version = "0.0.0";

@@ -479,6 +479,7 @@
     <Compile Include="Packets\ModlistMessage.cs" />
     <Compile Include="Patches\AvatarSwitchPatch.cs" />
     <Compile Include="Patches\LevelLoadPatch.cs" />
+    <Compile Include="Patches\LobbyCreatePatch.cs" />
     <Compile Include="Patches\PooleeSpawnPatch.cs" />
     <Compile Include="Patches\SpawnableResponsePatch.cs" />
     <Compile Include="Patches\SyncableCleanupPatch.cs" />

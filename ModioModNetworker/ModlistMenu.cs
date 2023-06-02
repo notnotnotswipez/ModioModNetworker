@@ -461,7 +461,12 @@ namespace ModioModNetworker
                     {
                         modInfoButton.CreateFunctionElement(buttonText, buttonColor, () =>
                         {
-                            modInfo.Download();
+                            ModFileManager.AddToQueue(new DownloadQueueElement()
+                            {
+                                associatedPlayer = null,
+                                info = modInfo,
+                                notify = true
+                            });
                             Refresh(true);
                         });
                     }

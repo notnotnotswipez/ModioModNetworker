@@ -5,6 +5,7 @@ using LabFusion.Representation;
 using LabFusion.Senders;
 using MelonLoader;
 using ModioModNetworker.Data;
+using SLZ.Marrow.SceneStreaming;
 
 namespace ModioModNetworker.Patches
 {

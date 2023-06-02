@@ -8,6 +8,8 @@ using System.Reflection;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Web.WebPages;
+using BoneLib;
+using BoneLib.BoneMenu.Elements;
 using LabFusion.Data;
 using LabFusion.Network;
 using LabFusion.Representation;
@@ -16,6 +18,7 @@ using LabFusion.Utilities;
 using MelonLoader;
 using MelonLoader.ICSharpCode.SharpZipLib.Zip;
 using ModioModNetworker.Data;
+using ModioModNetworker.Patches;
 using ModioModNetworker.Queue;
 using ModioModNetworker.UI;
 using ModioModNetworker.Utilities;
@@ -23,17 +26,25 @@ using SLZ.Marrow.SceneStreaming;
 using SLZ.Marrow.Warehouse;
 using SLZ.Rig;
 using UnityEngine;
+using File = System.IO.File;
 using ZipFile = System.IO.Compression.ZipFile;
 
 namespace ModioModNetworker
 {
+    public struct ModioModNetworkerUpdaterVersion
+    {
+        public const string versionString = "1.5.0";
+    }
+    
     public class MainClass : MelonMod
     {
 
         private static string MODIO_MODNETWORKER_DIRECTORY = MelonUtils.GameDirectory + "/ModIoModNetworker";
         private static string MODIO_AUTH_TXT_DIRECTORY = MODIO_MODNETWORKER_DIRECTORY+"/auth.txt";
+        private static string MODIO_BLACKLIST_TXT_DIRECTORY = MODIO_MODNETWORKER_DIRECTORY+"/blacklist.txt";
 
         public static List<string> subscribedModIoIds = new List<string>();
+        public static List<string> blacklistedModIoIds = new List<string>();
         private static List<string> toRemoveSubscribedModIoIds = new List<string>();
         public static List<ModInfo> subscribedMods = new List<ModInfo>();
         public static List<ModInfo> installedMods = new List<ModInfo>();
@@ -44,7 +55,7 @@ namespace ModioModNetworker
         public static bool warehouseReloadRequested = false;
         public static List<string> warehousePalletReloadTargets = new List<string>();
         public static List<string> warehouseReloadFolders = new List<string>();
-        
+
         public static bool subsChanged = false;
         public static bool refreshInstalledModsRequested = false;
         public static bool menuRefreshRequested = false;
@@ -110,6 +121,8 @@ namespace ModioModNetworker
             
             PrepareModFiles();
             string auth = ReadAuthKey();
+            blacklistedModIoIds = ReadBlacklist();
+            MelonLogger.Msg("Loaded blacklist with "+blacklistedModIoIds.Count+" entries.");
             if (auth.IsEmpty())
             {
                 MelonLogger.Error("---------------- IMPORTANT ERROR ----------------");
@@ -131,6 +144,7 @@ namespace ModioModNetworker
             MultiplayerHooking.OnDisconnect += OnDisconnect;
             MultiplayerHooking.OnStartServer += OnStartServer;
             MultiplayerHooking.OnPlayerRepCreated += OnPlayerRepCreated;
+            MultiplayerHooking.OnLobbyCategoryCreated += OnLobbyCategoryMade;
             MelonLogger.Msg("Populating currently installed mods via this mod.");
             installedMods.Clear();
             InstalledModInfos.Clear();
@@ -139,8 +153,14 @@ namespace ModioModNetworker
             PopulateSubscriptions();
             
             melonPreferencesCategory.SaveToFile();
-            
-            
+        }
+
+        private void OnLobbyCategoryMade(MenuCategory category, INetworkLobby lobby)
+        {
+            if (lobby.TryGetMetadata("modionetworker", out var value))
+            {
+                category.CreateFunctionElement("ModioModNetworker Active On Server", Color.cyan, () => { });
+            }
         }
 
         private void DeleteAllTempMods()
@@ -689,6 +709,30 @@ namespace ModioModNetworker
             {
                 CreateDefaultAuthText(MODIO_AUTH_TXT_DIRECTORY);
             }
+            
+            if (!File.Exists(MODIO_BLACKLIST_TXT_DIRECTORY))
+            {
+                CreateDefaultBlacklistText(MODIO_BLACKLIST_TXT_DIRECTORY);
+            }
+        }
+
+        private void CreateDefaultBlacklistText(string directory)
+        {
+            using (StreamWriter sw = File.CreateText(directory))    
+            {    
+                sw.WriteLine("#                       ----- WELCOME TO THE MOD.IO BLACKLIST TXT! -----");
+                sw.WriteLine("#");
+                sw.WriteLine("# This file is where you put mods that you DO NOT want to download under any circumstances.");
+                sw.WriteLine("# If you want to blacklist a mod, simply put the mod ID in this file, and it will not be downloaded.");
+                sw.WriteLine("# You can find the mod ID by going to the mod.io page for the mod, and looking at the URL.");
+                sw.WriteLine("# The mod ID is the name at the end of the URL.");
+                sw.WriteLine("# For example, if the URL is https://mod.io/g/bonelab/m/remove-bodylog-transform-vfx, the mod ID is remove-bodylog-transform-vfx");
+                sw.WriteLine("# To blacklist mods, simply put each mod ID on a new line. DO NOT START YOUR LINES WITH #, as this will comment out the line.");
+                sw.WriteLine("# Ex. ");
+                sw.WriteLine("# remove-bodylog-transform-vfx");
+                sw.WriteLine("# my-awesome-replacer");
+                sw.WriteLine("# annoying-mod");
+            }
         }
 
         private void CreateDefaultAuthText(string directory)
@@ -706,6 +750,22 @@ namespace ModioModNetworker
                 sw.WriteLine("# Once you've copied the token, paste it in this file, replacing the text labeled REPLACE_THIS_TEXT_WITH_YOUR_TOKEN.");
                 sw.WriteLine("AuthToken=REPLACE_THIS_TEXT_WITH_YOUR_TOKEN");
             }   
+        }
+        
+        private List<string> ReadBlacklist()
+        {
+            // Read the file and get the AuthToken= line
+            string[] lines = File.ReadAllLines(MODIO_BLACKLIST_TXT_DIRECTORY);
+            List<string> blacklist = new List<string>();
+            foreach (string line in lines)
+            {
+                if (!line.StartsWith("#"))
+                {
+                    blacklist.Add(line.Trim());
+                }
+            }
+            
+            return blacklist;
         }
 
         private string ReadAuthKey()

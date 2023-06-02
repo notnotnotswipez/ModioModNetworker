@@ -7,8 +7,8 @@ using System.Runtime.InteropServices;
 using LabFusion.SDK.Modules;
 
 // ...
-[assembly: MelonInfo(typeof(MainClass), "ModioModNetworker", "1.4.1", "notnotnotswipez")]
-[assembly: ModuleInfo(typeof(ModlistModule), "ModioModNetworkerModule", "1.4.1", "notnotnotswipez", "modiomodule", true, ConsoleColor.DarkCyan)]
+[assembly: MelonInfo(typeof(MainClass), "ModioModNetworker", ModioModNetworkerUpdaterVersion.versionString, "notnotnotswipez")]
+[assembly: ModuleInfo(typeof(ModlistModule), "ModioModNetworkerModule", ModioModNetworkerUpdaterVersion.versionString, "notnotnotswipez", "modiomodule", true, ConsoleColor.DarkCyan)]
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
@@ -40,5 +40,5 @@ using LabFusion.SDK.Modules;
 // You can specify all the values or you can default the Build and Revision Numbers 
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion(ModioModNetworkerUpdaterVersion.versionString)]
+[assembly: AssemblyFileVersion(ModioModNetworkerUpdaterVersion.versionString)]
