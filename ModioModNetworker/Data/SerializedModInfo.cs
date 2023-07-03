@@ -42,7 +42,6 @@ namespace ModioModNetworker.Data
             downloadLink = split[2];
             modId = split[3];
 
-            // TODO: MAKE THE MULTIPLAYER TAB!!!! AND DO THE NOTIFICATIONS!!!! CUSTOM ONES!!!!
             RepoModInfo repoModInfo = RepoManager.GetRepoModInfoFromModId(numericalId);
             modInfo = new ModInfo
             {
@@ -54,7 +53,7 @@ namespace ModioModNetworker.Data
                 version = versionNumber,
                 directDownloadLink = downloadLink,
                 fileSizeKB = fileSize,
-                fileName = numericalId+".zip"
+                fileName = modId+".zip"
             };
             if (repoModInfo != null) {
                 modInfo.modSummary = repoModInfo.summary;
