@@ -1,6 +1,7 @@
 using LabFusion.Data;
 using LabFusion.Network;
 using LabFusion.Utilities;
+using ModioModNetworker.Repo;
 
 namespace ModioModNetworker.Data
 {
@@ -11,8 +12,9 @@ namespace ModioModNetworker.Data
         public ModInfo modInfo;
         private float fileSize;
         private string downloadLink;
-        private string modId;
+        private string numericalId;
         private string versionNumber;
+        private string modId;
         
         public static SerializedModInfo Create(ModInfo info)
         {
@@ -20,9 +22,10 @@ namespace ModioModNetworker.Data
             {
                 valid = info.isValidMod,
                 mature = info.mature,
+                modId = info.modId,
                 fileSize = info.fileSizeKB,
                 downloadLink = info.directDownloadLink,
-                modId = info.modId,
+                numericalId = info.numericalId,
                 versionNumber = info.version
             };
         }
@@ -34,20 +37,30 @@ namespace ModioModNetworker.Data
             fileSize = reader.ReadSingle();
             string received = reader.ReadString();
             string[] split = received.Split(GameObjectUtilities.PathSeparator);
-            modId = split[0];
+            numericalId = split[0];
             versionNumber = split[1];
             downloadLink = split[2];
+            modId = split[3];
+
+            // TODO: MAKE THE MULTIPLAYER TAB!!!! AND DO THE NOTIFICATIONS!!!! CUSTOM ONES!!!!
+            RepoModInfo repoModInfo = RepoManager.GetRepoModInfoFromModId(numericalId);
             modInfo = new ModInfo
             {
                 structureVersion = ModInfo.globalStructureVersion,
                 isValidMod = valid,
+                numericalId = numericalId,
                 modId = modId,
                 mature = mature,
                 version = versionNumber,
                 directDownloadLink = downloadLink,
                 fileSizeKB = fileSize,
-                fileName = modId+".zip"
+                fileName = numericalId+".zip"
             };
+            if (repoModInfo != null) {
+                modInfo.modSummary = repoModInfo.summary;
+                modInfo.modName = repoModInfo.modName;
+                modInfo.thumbnailLink = repoModInfo.thumbnailLink;
+            }
         }
 
         public void Serialize(FusionWriter writer)
@@ -56,9 +69,10 @@ namespace ModioModNetworker.Data
             writer.Write(mature);
             writer.Write(fileSize);
             string built = "";
-            built += modId + GameObjectUtilities.PathSeparator;
+            built += numericalId + GameObjectUtilities.PathSeparator;
             built += versionNumber + GameObjectUtilities.PathSeparator;
-            built += downloadLink;
+            built += downloadLink + GameObjectUtilities.PathSeparator;
+            built += modId;
             writer.Write(built);
         }
     }

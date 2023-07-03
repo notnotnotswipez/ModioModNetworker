@@ -3,8 +3,10 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Web.WebPages;
@@ -17,11 +19,14 @@ using LabFusion.SDK.Modules;
 using LabFusion.Utilities;
 using MelonLoader;
 using MelonLoader.ICSharpCode.SharpZipLib.Zip;
+using MelonLoader.TinyJSON;
 using ModioModNetworker.Data;
 using ModioModNetworker.Patches;
 using ModioModNetworker.Queue;
+using ModioModNetworker.Repo;
 using ModioModNetworker.UI;
 using ModioModNetworker.Utilities;
+using ModIoModNetworker.Ui;
 using SLZ.Marrow.SceneStreaming;
 using SLZ.Marrow.Warehouse;
 using SLZ.Rig;
@@ -33,7 +38,7 @@ namespace ModioModNetworker
 {
     public struct ModioModNetworkerUpdaterVersion
     {
-        public const string versionString = "1.5.0";
+        public const string versionString = "2.0.0";
     }
     
     public class MainClass : MelonMod
@@ -43,12 +48,13 @@ namespace ModioModNetworker
         private static string MODIO_AUTH_TXT_DIRECTORY = MODIO_MODNETWORKER_DIRECTORY+"/auth.txt";
         private static string MODIO_BLACKLIST_TXT_DIRECTORY = MODIO_MODNETWORKER_DIRECTORY+"/blacklist.txt";
 
-        public static List<string> subscribedModIoIds = new List<string>();
+        public static List<string> subscribedModIoNumericalIds = new List<string>();
         public static List<string> blacklistedModIoIds = new List<string>();
         private static List<string> toRemoveSubscribedModIoIds = new List<string>();
         public static List<ModInfo> subscribedMods = new List<ModInfo>();
         public static List<ModInfo> installedMods = new List<ModInfo>();
         public static List<InstalledModInfo> InstalledModInfos = new List<InstalledModInfo>();
+        public static List<RepoModInfo> untrackedInstalledModInfos = new List<RepoModInfo>();
 
         private static List<InstalledModInfo> outOfDateModInfos = new List<InstalledModInfo>();
 
@@ -58,9 +64,11 @@ namespace ModioModNetworker
 
         public static bool subsChanged = false;
         public static bool refreshInstalledModsRequested = false;
+        public static bool refreshSubscribedModsRequested = false;
         public static bool menuRefreshRequested = false;
 
         public static string subscriptionThreadString = "";
+        public static string trendingThreadString = "";
         public static bool subsRefreshing = false;
         private static int desiredSubs = 0;
 
@@ -73,6 +81,7 @@ namespace ModioModNetworker
         public static MelonPreferences_Entry<bool> autoDownloadLevelsConfig;
         public static MelonPreferences_Entry<bool> downloadMatureContentConfig;
         public static MelonPreferences_Entry<bool> tempLobbyModsConfig;
+        public static MelonPreferences_Entry<bool> useRepoConfig;
         public static MelonPreferences_Entry<float> maxAutoDownloadMbConfig;
         public static MelonPreferences_Entry<float> maxLevelAutoDownloadGbConfig;
 
@@ -83,6 +92,7 @@ namespace ModioModNetworker
         public static float levelMaxGb = 1f;
         public static bool downloadMatureContent = false;
         public static bool tempLobbyMods = false;
+        public static bool useRepo = false;
         
         private static int subsShown = 0;
         private static int subTotal = 0;
@@ -90,9 +100,15 @@ namespace ModioModNetworker
         public bool palletLock = false;
 
         public static bool confirmedHostHasIt = false;
+        private static bool loadedInstalled = false;
+
+        public static bool handlingInstalled = false;
+        public static bool handlingSubscribed = false;
 
         public override void OnInitializeMelon()
         {
+           
+
             melonPreferencesCategory = MelonPreferences.CreateCategory("ModioModNetworker");
             melonPreferencesCategory.SetFilePath(MelonUtils.UserDataDirectory+"/ModioModNetworker.cfg");
             modsDirectory =
@@ -103,6 +119,7 @@ namespace ModioModNetworker
             autoDownloadLevelsConfig = melonPreferencesCategory.CreateEntry<bool>("AutoDownloadLevels", false);
             maxLevelAutoDownloadGbConfig = melonPreferencesCategory.CreateEntry<float>("MaxLevelAutoDownloadGb", 1f);
             tempLobbyModsConfig = melonPreferencesCategory.CreateEntry<bool>("TemporaryLobbyMods", false, null, "If set to true, lobby mods like (avatars/spawnables/levels) that got auto downloaded will be deleted when you leave the lobby.");
+            useRepoConfig = melonPreferencesCategory.CreateEntry<bool>("UseRepoConfig", true, null, "If set to true, ModIoModNetworker will scan the repos available at https://blrepo.laund.moe/ for the mod.io IDs. This means it should find the proper mods automatically in any lobby, even if the host/other players do not have networker.");
             maxAutoDownloadMbConfig = melonPreferencesCategory.CreateEntry<float>("MaxAutoDownloadMb", 500f);
             downloadMatureContentConfig = melonPreferencesCategory.CreateEntry<bool>("DownloadMatureContent", false);
             
@@ -113,12 +130,18 @@ namespace ModioModNetworker
             autoDownloadLevels = autoDownloadLevelsConfig.Value;
             tempLobbyMods = tempLobbyModsConfig.Value;
             levelMaxGb = maxLevelAutoDownloadGbConfig.Value;
+            useRepo = useRepoConfig.Value;
             
             ModFileManager.MOD_FOLDER_PATH = modsDirectory.Value;
+
+            RepoManager.LoadBarcodePairsFromRepos();
             
             var assetBundle = EmbeddedAssetBundle.LoadFromAssembly(Assembly.GetExecutingAssembly(), "ModioModNetworker.Resources.networker.assets");
             NetworkerAssets.LoadAssets(assetBundle);
-            
+
+            var uiAssets = EmbeddedAssetBundle.LoadFromAssembly(Assembly.GetExecutingAssembly(), "ModioModNetworker.Resources.networkermenu.networker");
+            NetworkerAssets.LoadAssetsUI(uiAssets);
+
             PrepareModFiles();
             string auth = ReadAuthKey();
             blacklistedModIoIds = ReadBlacklist();
@@ -149,8 +172,10 @@ namespace ModioModNetworker
             installedMods.Clear();
             InstalledModInfos.Clear();
             PopulateInstalledMods(ModFileManager.MOD_FOLDER_PATH);
+            loadedInstalled = true;
             MelonLogger.Msg("Checking mod.io account subscriptions");
             PopulateSubscriptions();
+            ModFileManager.QueueTrending(0);
             
             melonPreferencesCategory.SaveToFile();
         }
@@ -161,6 +186,28 @@ namespace ModioModNetworker
             {
                 category.CreateFunctionElement("ModioModNetworker Active On Server", Color.cyan, () => { });
             }
+            if (lobby.TryGetMetadata("LevelBarcode", out var barcode))
+            {
+                if (!FusionSceneManager.HasLevel(barcode)) {
+                    category.CreateFunctionElement("Download Level", Color.cyan, () => {
+                        FusionNotifier.Send(new FusionNotification()
+                        {
+                            title = new NotificationText("Installing lobby level...", Color.cyan, true),
+                            showTitleOnPopup = true,
+                            popupLength = 1f,
+                            message = "Please wait",
+                            isMenuItem = false,
+                            isPopup = true,
+                        });
+                        RepoModInfo repoModInfo = RepoManager.GetRepoModInfoFromPalletBarcode(RepoManager.GetPalletBarcodeFromCrateBarcode(barcode));
+                        if (repoModInfo != null)
+                        {
+                            // Native install because it was of our own volition
+                            ModInfo.RequestModInfoNumerical(repoModInfo.modNumericalId, "install_native");
+                        }
+                    });
+                }
+            }
         }
 
         private void DeleteAllTempMods()
@@ -169,7 +216,7 @@ namespace ModioModNetworker
             {
                 if (modInfo.temp)
                 {
-                    ModFileManager.UnInstall(modInfo.modId);
+                    ModFileManager.UnInstall(modInfo.numericalId);
                 }
             }
         }
@@ -180,6 +227,9 @@ namespace ModioModNetworker
             {
                 bar.Update();
             }
+
+            ThumbnailThreader.HandleQueue();
+            MainThreadManager.HandleQueue();
             
             LevelHoldQueue.Update();
 
@@ -229,6 +279,7 @@ namespace ModioModNetworker
                         }
                         SpawnableHoldQueue.CheckValid(s);
                         LevelHoldQueue.CheckValid(s);
+      
                     });
                     addedCallback = true;
                     DeleteAllTempMods();
@@ -237,16 +288,17 @@ namespace ModioModNetworker
 
             if (subsRefreshing)
             {
-                if (subscribedModIoIds.Count >= desiredSubs)
+                if (subscribedModIoNumericalIds.Count >= desiredSubs)
                 {
                     // Remove all invalid modids from the list
                     foreach (var modioId in toRemoveSubscribedModIoIds)
                     {
-                        subscribedModIoIds.Remove(modioId);
+                        subscribedModIoNumericalIds.Remove(modioId);
                     }
                     toRemoveSubscribedModIoIds.Clear();
                     ModlistMenu.Refresh(true);
                     subsRefreshing = false;
+                    handlingSubscribed = false;
                     FusionNotifier.Send(new FusionNotification()
                     {
                         title = new NotificationText("Mod.io Subscriptions Refreshed!", Color.cyan, true),
@@ -256,6 +308,28 @@ namespace ModioModNetworker
                         isPopup = true,
                     });
                     MelonLogger.Msg("Finished refreshing mod.io subscriptions!");
+                    
+
+                    // If there are outdated remaining ones, that means they come from an older version of networker where they were installed but
+                    // Never subscribed to. We have to pull the new information from the repo instead.
+                    foreach (var outOfDateInfo in outOfDateModInfos)
+                    {
+                        RepoModInfo repoModInfo = RepoManager.GetRepoModInfoFromPalletBarcode(outOfDateInfo.palletBarcode);
+                        if (repoModInfo != null)
+                        {
+                            // This is just for tracking purposes, we remake a "fake" one when its done
+                            ModInfo modInfo = new ModInfo()
+                            { 
+                                modSummary = repoModInfo.summary,
+                                modName = repoModInfo.modName,
+                                thumbnailLink = repoModInfo.thumbnailLink,
+                                numericalId = repoModInfo.modNumericalId,
+                                mature = outOfDateInfo.ModInfo.mature
+                            };
+                            UpdateModInfo(modInfo, outOfDateInfo);
+                        }
+                    }
+                    outOfDateModInfos.Clear();
                 }
             }
 
@@ -271,6 +345,7 @@ namespace ModioModNetworker
 
                 if (warehouseReloadFolders.Count > 0)
                 {
+                    AssetWarehouse.Instance.ReloadPallet(warehouseReloadFolders[0]);
                     AssetWarehouse.Instance.LoadPalletFromFolderAsync(warehouseReloadFolders[0], true);
                     // Remove the first element from the list
                     warehouseReloadFolders.RemoveAt(0);
@@ -299,7 +374,7 @@ namespace ModioModNetworker
                             isPopup = true,
                         });
                     }
-                    
+
                     if (ModFileManager.activeDownloadQueueElement != null)
                     {
                         if (ModFileManager.activeDownloadQueueElement.associatedPlayer != null)
@@ -310,13 +385,12 @@ namespace ModioModNetworker
                             }
                         }
                     }
-
-
                     palletLock = false;
                     warehouseReloadRequested = false;
                     ModFileManager.isDownloading = false;
                     ModlistMenu.activeDownloadModInfo = null;
                     ModFileManager.activeDownloadQueueElement = null;
+                    MelonLogger.Msg("Set active download stuff");
                 }
             }
             
@@ -369,19 +443,51 @@ namespace ModioModNetworker
                 menuRefreshRequested = false;
             }
 
-            if (refreshInstalledModsRequested)
+            if (refreshSubscribedModsRequested && !handlingInstalled && !handlingSubscribed) {
+                refreshSubscribedModsRequested = false;
+                handlingSubscribed = true;
+
+                subscribedMods.Clear();
+                subscribedModIoNumericalIds.Clear();
+                subTotal = 0;
+                subsShown = 0;
+                desiredSubs = 0;
+                ModFileManager.QueueSubscriptions(subsShown);
+            }
+
+            if (refreshInstalledModsRequested && !handlingSubscribed && !handlingInstalled)
             {
                 installedMods.Clear();
                 InstalledModInfos.Clear();
+                untrackedInstalledModInfos.Clear();
+                NetworkerMenuController.totalInstalled.Clear();
                 ModlistMenu.installPage = 0;
-                PopulateInstalledMods(ModFileManager.MOD_FOLDER_PATH);
+                Thread thread = new Thread(() =>
+                {
+                    handlingInstalled = true;
+                    PopulateInstalledMods(ModFileManager.MOD_FOLDER_PATH);
+                    handlingInstalled = false;
+                });
+                thread.Start();
+                loadedInstalled = true;
                 ModlistMenu.Refresh(true);
                 refreshInstalledModsRequested = false;
+                if (NetworkerMenuController.instance)
+                {
+                    NetworkerMenuController.instance.UpdateModPopupButtons();
+                }
             }
 
             if (!subscriptionThreadString.IsEmpty())
             {
                 InternalPopulateSubscriptions();
+            }
+            if (!trendingThreadString.IsEmpty())
+            {
+                InternalPopulateTrending();
+                if (NetworkerMenuController.instance) {
+                    NetworkerMenuController.instance.OnNewTrendingRecieved();
+                }
             }
         }
 
@@ -389,6 +495,10 @@ namespace ModioModNetworker
         {
             ModInfo original = installed.ModInfo;
             original.mature = subscribed.mature;
+            original.modSummary = subscribed.modSummary;
+            original.modName = subscribed.modName;
+            original.thumbnailLink = subscribed.thumbnailLink;
+            original.numericalId = subscribed.numericalId;
             original.structureVersion = ModInfo.globalStructureVersion;
             if (original.version == null)
             {
@@ -428,7 +538,7 @@ namespace ModioModNetworker
 
             if (!modInfo.isValidMod)
             {
-                toRemoveSubscribedModIoIds.Add(modInfo.modId);
+                toRemoveSubscribedModIoIds.Add(modInfo.numericalId);
             }
 
             ModFileManager.AddToQueue(new DownloadQueueElement()
@@ -436,18 +546,91 @@ namespace ModioModNetworker
                 associatedPlayer = null,
                 info = modInfo
             });
-            subscribedModIoIds.Add(modInfo.modId);
+
+            subscribedModIoNumericalIds.Add(modInfo.numericalId);
             subscribedMods.Add(modInfo);
         }
 
         public static void PopulateSubscriptions()
         {
-            subscribedMods.Clear();
-            subscribedModIoIds.Clear();
-            subTotal = 0;
-            subsShown = 0;
-            desiredSubs = 0;
-            ModFileManager.QueueSubscriptions(subsShown);
+            refreshSubscribedModsRequested = true;
+        }
+
+        private static void InternalPopulateTrending() {
+            string json = trendingThreadString;
+            trendingThreadString = "";
+            JavaScriptSerializer serializer = new JavaScriptSerializer();
+            var trending = serializer.Deserialize<dynamic>(json);
+            foreach (var modEntry in trending["data"])
+            {
+
+                string modUrl = modEntry["profile_url"];
+                string numericalId = "" + modEntry["id"];
+                string modTitle = modEntry["name"];
+                string summary = modEntry["summary"];
+                string thumbnailLink = modEntry["logo"]["thumb_640x360"];
+                string[] split = modUrl.Split('/');
+                string name = split[split.Length - 1];
+                bool valid = true;
+                int windowsId = 0;
+                int androidId = 0;
+                foreach (var platform in modEntry["platforms"])
+                {
+                    if (platform["platform"] == "windows")
+                    {
+                        int desired = platform["modfile_live"];
+                        windowsId = desired;
+                        break;
+                    }
+                }
+
+                foreach (var platform in modEntry["platforms"])
+                {
+                    if (platform["platform"] == "android")
+                    {
+                        int desired = platform["modfile_live"];
+                        androidId = desired;
+                        break;
+                    }
+                }
+
+                if (windowsId != 0)
+                {
+                    if (androidId != 0)
+                    {
+                        if (windowsId == androidId)
+                        {
+                            valid = false;
+                        }
+                    }
+                }
+
+                if (modEntry["status"] == 3)
+                {
+                    valid = false;
+                }
+
+                ModInfo modInfo = ModInfo.MakeFromDynamic(modEntry["modfile"], name);
+                modInfo.isValidMod = false;
+                modInfo.mature = modEntry["maturity_option"] > 0;
+                modInfo.modName = modTitle;
+                modInfo.thumbnailLink = thumbnailLink;
+                modInfo.modSummary = summary;
+                modInfo.numericalId = numericalId;
+
+                if (valid)
+                {
+                    modInfo.directDownloadLink = $"https://api.mod.io/v1/games/3809/mods/{modEntry["id"]}/files/{windowsId}/download";
+                    modInfo.isValidMod = true;
+                }
+
+                if (modInfo.version == null)
+                {
+                    modInfo.version = "0.0.0";
+                }
+
+                NetworkerMenuController.modIoRetrieved.Add(modInfo);
+            }
         }
 
         private static void InternalPopulateSubscriptions()
@@ -493,6 +676,10 @@ namespace ModioModNetworker
                 if (sub["game_id"] == 3809)
                 {
                     string modUrl = sub["profile_url"];
+                    string numericalId = ""+sub["id"];
+                    string modTitle = sub["name"];
+                    string summary = sub["summary"];
+                    string thumbnailLink = sub["logo"]["thumb_640x360"];
                     string[] split = modUrl.Split('/');
                     string name = split[split.Length - 1];
                     bool valid = true;
@@ -537,6 +724,11 @@ namespace ModioModNetworker
                     ModInfo modInfo = ModInfo.MakeFromDynamic(sub["modfile"], name);
                     modInfo.isValidMod = false;
                     modInfo.mature = sub["maturity_option"] > 0;
+                    modInfo.modName = modTitle;
+                    modInfo.thumbnailLink = thumbnailLink;
+                    modInfo.modSummary = summary;
+                    modInfo.numericalId = numericalId;
+         
 
                     if (valid)
                     {
@@ -563,64 +755,110 @@ namespace ModioModNetworker
 
         public void PopulateInstalledMods(string directory)
         {
-            foreach (var subDirectory in Directory.GetDirectories(directory))
-            {
-                PopulateInstalledMods(subDirectory);
-            }
-            JavaScriptSerializer serializer = new JavaScriptSerializer();
-            string palletId = "";
-            bool validMod = false;
-            foreach (var file in Directory.GetFiles(directory))
-            {
-                if (file.EndsWith("pallet.json"))
-                {
-                    string fileContents = File.ReadAllText(file);
-                    var jsonData = serializer.Deserialize<dynamic>(fileContents);
-                    try
-                    {
-                        palletId = jsonData["objects"]["o:1"]["barcode"];
-                        validMod = true;
-                    }
-                    catch (Exception e)
-                    {
-                        MelonLogger.Warning($"Failed to parse pallet.json for mod {directory}: {e}");
-                    }
-                }
-            }
+            // Sort by latest
+            var latestDirectories = new DirectoryInfo(directory).GetDirectories()
+                                                  .OrderByDescending(f => f.LastWriteTime)
+                                                  .ToList();
 
-            if (validMod)
+            foreach (var subDirectory in latestDirectories)
             {
+                PopulateInstalledMods(subDirectory.FullName);
+            }
+            try {
+                JavaScriptSerializer serializer = new JavaScriptSerializer();
+                string palletId = "";
+                bool validMod = false;
+                string palletJsonPath = "";
                 foreach (var file in Directory.GetFiles(directory))
                 {
-                    if (file.EndsWith("modinfo.json"))
+                    if (file.EndsWith("pallet.json"))
                     {
-                        var modInfo = serializer.Deserialize<ModInfo>(File.ReadAllText(file));
-                        
-
-                        foreach (var alreadyInstalled in installedMods)
+                        palletJsonPath = file;
+                        string fileContents = File.ReadAllText(file);
+                        var jsonData = serializer.Deserialize<dynamic>(fileContents);
+                        try
                         {
-                            if (alreadyInstalled.modId == modInfo.modId)
+                            palletId = jsonData["objects"]["o:1"]["barcode"];
+                            validMod = true;
+                        }
+                        catch (Exception e)
+                        {
+                            MelonLogger.Warning($"Failed to parse pallet.json for mod {directory}: {e}");
+                        }
+                    }
+                }
+
+                if (validMod)
+                {
+                    bool foundModInfo = false;
+                    foreach (var file in Directory.GetFiles(directory))
+                    {
+                        if (file.EndsWith("modinfo.json"))
+                        {
+                            var modInfo = serializer.Deserialize<ModInfo>(File.ReadAllText(file));
+                            foundModInfo = true;
+                            bool installedAlready = false;
+
+                            // We can use modid for this cause these are tracked
+                            foreach (var alreadyInstalled in installedMods)
+                            {
+                                if (alreadyInstalled.numericalId == modInfo.numericalId)
+                                {
+                                    installedAlready = true;
+                                }
+                            }
+
+                            if (installedAlready) {
+                                continue;
+                            }
+
+                            installedMods.Add(modInfo);
+                            InstalledModInfo installedModInfo = new InstalledModInfo()
+                            {
+                                modinfoJsonPath = file,
+                                modId = modInfo.modId,
+                                palletBarcode = palletId,
+                                ModInfo = modInfo
+                            };
+
+                            NetworkerMenuController.totalInstalled.Add(modInfo);
+                            InstalledModInfos.Add(installedModInfo);
+                            if (modInfo.structureVersion != ModInfo.globalStructureVersion)
+                            {
+                                outOfDateModInfos.Add(installedModInfo);
+                            }
+                        }
+                    }
+
+                    if (!foundModInfo) {
+                        // This means this is NOT a networker tracked mod, but with the repo we can mangle it to be one.
+                        foreach (var alreadyInstalled in InstalledModInfos)
+                        {
+                            if (alreadyInstalled.palletBarcode == palletId)
                             {
                                 return;
                             }
                         }
 
-                        installedMods.Add(modInfo);
-                        InstalledModInfo installedModInfo = new InstalledModInfo()
-                        {
-                            modinfoJsonPath = file, 
-                            modId = modInfo.modId, 
-                            palletBarcode = palletId, 
-                            ModInfo = modInfo
-                        };
-                        
-                        InstalledModInfos.Add(installedModInfo);
-                        if (modInfo.structureVersion < ModInfo.globalStructureVersion)
-                        {
-                            outOfDateModInfos.Add(installedModInfo);
+                        RepoModInfo repoModInfo = RepoManager.GetRepoModInfoFromPalletBarcode(palletId);
+                        if (repoModInfo != null) {
+                            repoModInfo.palletJsonPath = palletJsonPath;
+                            ModInfo falseReconstruction = new ModInfo()
+                            {
+                                modName = repoModInfo.modName,
+                                thumbnailLink = repoModInfo.thumbnailLink,
+                                modSummary = repoModInfo.summary,
+                                numericalId = repoModInfo.modNumericalId
+                            };
+                      
+                            NetworkerMenuController.totalInstalled.Add(falseReconstruction);
+                            untrackedInstalledModInfos.Add(repoModInfo);
                         }
                     }
                 }
+            }
+            catch {
+                MelonLogger.Error("Got an error while parsing installed mod at: " + directory);
             }
         }
 
@@ -759,13 +997,39 @@ namespace ModioModNetworker
             List<string> blacklist = new List<string>();
             foreach (string line in lines)
             {
-                if (!line.StartsWith("#"))
+                if (!line.StartsWith("#") && !line.IsEmpty())
                 {
                     blacklist.Add(line.Trim());
                 }
             }
             
             return blacklist;
+        }
+
+        public static void WriteLineToBlacklist(string line) {
+            using (StreamWriter file = new StreamWriter(MODIO_BLACKLIST_TXT_DIRECTORY, true))
+            {
+                file.WriteLine(line);
+            }
+        }
+
+        public static void RemoveLineFromBlacklist(string line)
+        {
+            var tempFilePath = Path.GetTempFileName();
+            using (var sr = new StreamReader(MODIO_BLACKLIST_TXT_DIRECTORY))
+            using (var sw = new StreamWriter(tempFilePath))
+            {
+                string currentLine;
+                while ((currentLine = sr.ReadLine()) != null)
+                {
+                    if (currentLine != line)
+                    {
+                        sw.WriteLine(currentLine);
+                    }
+                }
+            }
+            File.Delete(MODIO_BLACKLIST_TXT_DIRECTORY);
+            File.Move(tempFilePath, MODIO_BLACKLIST_TXT_DIRECTORY);
         }
 
         private string ReadAuthKey()

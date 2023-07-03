@@ -28,7 +28,7 @@ namespace ModioModNetworker.UI
 
         public AvatarDownloadBar(PlayerRep rep)
         {
-            GameObject go = GameObject.Instantiate(NetworkerAssets.AvatarDownloadBarPrefab);
+            GameObject go = GameObject.Instantiate(NetworkerAssets.avatarDownloadBarPrefab);
             GameObject.DontDestroyOnLoad(go);
             go.hideFlags = HideFlags.DontUnloadUnusedAsset;
             bar = go;

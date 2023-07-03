@@ -7,6 +7,7 @@ using LabFusion.Representation;
 using LabFusion.Utilities;
 using MelonLoader;
 using ModioModNetworker.Data;
+using ModIoModNetworker.Ui;
 using SLZ.Marrow.SceneStreaming;
 
 namespace ModioModNetworker
@@ -108,108 +109,116 @@ namespace ModioModNetworker
                                 switch (data.modType)
                                 {
                                     case ModlistData.ModType.AVATAR:
-                                    {
-                                        if (!avatarMods.ContainsKey(data.playerId))
                                         {
-                                            avatarMods.Add(data.playerId, modInfo);
-                                        }
-                                        else
-                                        {
-                                            avatarMods[data.playerId] = modInfo;
-                                        }
-                                
-                                        if (SceneStreamer._session != null)
-                                        {
-                                            if (SceneStreamer._session.Status == StreamStatus.LOADING)
-                                            {
-                                                waitAndQueue.Add(modInfo);
-                                                return;
-                                            }
-                                        }
 
-                                        float mb = modInfo.fileSizeKB / 1000000;
-                                        if (mb < MainClass.maxAutoDownloadMb && MainClass.autoDownloadAvatars)
-                                        {
-                                            if (!MainClass.downloadMatureContent && modInfo.mature)
+                                            if (!avatarMods.ContainsKey(data.playerId))
                                             {
-                                                return;
+                                                avatarMods.Add(data.playerId, modInfo);
                                             }
-                                            
-                                            if (modInfo.IsSubscribed())
+                                            else
                                             {
-                                                return;
-                                            }
-                                            
-                                            if (MainClass.tempLobbyMods)
-                                            {
-                                                modInfo.temp = true;
+                                                avatarMods[data.playerId] = modInfo;
                                             }
 
-                                            ModFileManager.AddToQueue(new DownloadQueueElement()
+                                            if (SceneStreamer._session != null)
                                             {
-                                                associatedPlayer = data.playerId,
-                                                info = modInfo,
-                                                notify = false
-                                            });
+                                                if (SceneStreamer._session.Status == StreamStatus.LOADING)
+                                                {
+                                                    waitAndQueue.Add(modInfo);
+                                                    return;
+                                                }
+                                            }
+
+                                            float mb = modInfo.fileSizeKB / 1000000;
+                                            if (mb < MainClass.maxAutoDownloadMb && MainClass.autoDownloadAvatars)
+                                            {
+                                                if (!MainClass.downloadMatureContent && modInfo.mature)
+                                                {
+                                                    return;
+                                                }
+
+                                                if (modInfo.IsSubscribed())
+                                                {
+                                                    return;
+                                                }
+
+                                                if (MainClass.tempLobbyMods)
+                                                {
+                                                    modInfo.temp = true;
+                                                }
+
+                                                ModFileManager.AddToQueue(new DownloadQueueElement()
+                                                {
+                                                    associatedPlayer = data.playerId,
+                                                    info = modInfo,
+                                                    notify = false
+                                                });
+                                            }
+                                            break;
                                         }
-                                        break;
-                                    }
                                     case ModlistData.ModType.SPAWNABLE:
-                                    {
-                                        float mb = modInfo.fileSizeKB / 1000000;
-                        
-                                        if (MainClass.autoDownloadSpawnables && mb < MainClass.maxAutoDownloadMb)
                                         {
-                                            if (!MainClass.downloadMatureContent && modInfo.mature)
+                                            float mb = modInfo.fileSizeKB / 1000000;
+
+                                            if (MainClass.autoDownloadSpawnables && mb < MainClass.maxAutoDownloadMb)
                                             {
-                                                return;
+                                                if (!MainClass.downloadMatureContent && modInfo.mature)
+                                                {
+                                                    return;
+                                                }
+
+                                                if (modInfo.IsSubscribed())
+                                                {
+                                                    return;
+                                                }
+
+                                                if (MainClass.tempLobbyMods)
+                                                {
+                                                    modInfo.temp = true;
+                                                }
+
+                                                ModFileManager.AddToQueue(new DownloadQueueElement()
+                                                {
+                                                    associatedPlayer = null,
+                                                    info = modInfo,
+                                                });
                                             }
 
-                                            if (modInfo.IsSubscribed())
-                                            {
-                                                return;
-                                            }
-
-                                            if (MainClass.tempLobbyMods)
-                                            {
-                                                modInfo.temp = true;
-                                            }
-                            
-                                            ModFileManager.AddToQueue(new DownloadQueueElement()
-                                            {
-                                                associatedPlayer = null,
-                                                info = modInfo,
-                                            });
+                                            break;
                                         }
-
-                                        break;
-                                    }
                                     case ModlistData.ModType.LEVEL:
-                                    {
-                                        float mb = modInfo.fileSizeKB / 1000000;
-                                        float gb = mb / 1000;
-                        
-                                        if (MainClass.autoDownloadLevels && gb < MainClass.levelMaxGb)
                                         {
-                                            if (!MainClass.downloadMatureContent && modInfo.mature)
+
+                                            if (MainClass.useRepo)
                                             {
                                                 return;
                                             }
 
-                                            if (MainClass.tempLobbyMods)
+                                            float mb = modInfo.fileSizeKB / 1000000;
+                                            float gb = mb / 1000;
+
+                                            if (MainClass.autoDownloadLevels && gb < MainClass.levelMaxGb)
                                             {
-                                                modInfo.temp = true;
+                                                if (!MainClass.downloadMatureContent && modInfo.mature)
+                                                {
+                                                    return;
+                                                }
+
+                                                if (MainClass.tempLobbyMods)
+                                                {
+                                                    modInfo.temp = true;
+                                                }
+
+                                                ModFileManager.AddToQueue(new DownloadQueueElement()
+                                                {
+                                                    associatedPlayer = null,
+                                                    info = modInfo,
+                                                });
                                             }
 
-                                            ModFileManager.AddToQueue(new DownloadQueueElement()
-                                            {
-                                                associatedPlayer = null,
-                                                info = modInfo,
-                                            });
+                                            break;
                                         }
 
-                                        break;
-                                    }
                                 }
                             }
                         }
@@ -222,7 +231,7 @@ namespace ModioModNetworker
                             if (data.isFinal)
                             {
                                 MelonLogger.Msg("Got modlist data");
-                                ModlistMenu.PopulateModInfos(modlist);
+                                NetworkerMenuController.SetHostSubscribedMods(modlist);
                                 modlist.Clear();
                             }
                         }

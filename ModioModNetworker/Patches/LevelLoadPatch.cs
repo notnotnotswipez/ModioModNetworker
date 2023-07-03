@@ -6,6 +6,7 @@ using LabFusion.Utilities;
 using MelonLoader;
 using ModioModNetworker.Data;
 using ModioModNetworker.Queue;
+using ModioModNetworker.Repo;
 using ModioModNetworker.Utilities;
 using SLZ.Marrow.Warehouse;
 
@@ -18,21 +19,30 @@ namespace ModioModNetworker.Patches
         {
             public static bool Prefix(byte[] bytes, bool isServerHandled = false)
             {
-                if (!NetworkInfo.IsServer && !isServerHandled && MainClass.confirmedHostHasIt && MainClass.autoDownloadLevels) {
+                if (!NetworkInfo.IsServer && !isServerHandled && MainClass.autoDownloadLevels) {
                     using (var reader = FusionReader.Create(bytes)) {
                         using (var data = reader.ReadFusionSerializable<SceneLoadData>()) {
                             
                             // Clear the level queue no matter what because no matter what outcome it is, we are going to be loading a new level.
                             LevelHoldQueue.ClearQueue();
-                            
-                            if (!IsCrate(data.levelBarcode))
-                            {
-                                LevelHoldQueue.SetQueue(new LevelHoldQueue.LevelHoldQueueData()
+
+                            if (MainClass.confirmedHostHasIt || MainClass.useRepo) {
+                                if (!IsCrate(data.levelBarcode))
                                 {
-                                    missingBarcode = data.levelBarcode,
-                                    _data = data
-                                });
-                                return false;
+                                    if (MainClass.useRepo) {
+                                        string palletBarcode = RepoManager.GetPalletBarcodeFromCrateBarcode(data.levelBarcode);
+                                        string existingNumericalId = RepoManager.GetRepoModInfoFromPalletBarcode(palletBarcode).modNumericalId;
+                                        if (existingNumericalId != null) {
+                                            ModInfo.RequestModInfoNumerical(existingNumericalId, "install_level");
+                                        }
+                                    }
+                                    LevelHoldQueue.SetQueue(new LevelHoldQueue.LevelHoldQueueData()
+                                    {
+                                        missingBarcode = data.levelBarcode,
+                                        _data = data
+                                    });
+                                    return false;
+                                }
                             }
                         }
                     }

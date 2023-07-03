@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using BoneLib;
+using LabFusion.Representation;
 using LabFusion.Utilities;
 using MelonLoader;
 
@@ -15,6 +16,8 @@ namespace ModioModNetworker.Data
         public string modId;
         public string json;
         public string destination;
+        public bool mature = false;
+        public dynamic originalModInfo;
     }
 
     public class ModInfo
@@ -24,15 +27,19 @@ namespace ModioModNetworker.Data
         public bool mature;
         public string modId;
         public float fileSizeKB;
+        public string thumbnailLink;
+        public string modName;
+        public string modSummary;
         public string fileName;
         public string directDownloadLink;
         public double modDownloadPercentage;
+        public string numericalId;
         public string version = "0.0.0";
         public int structureVersion = 0;
         public bool temp = false;
 
         private static Action onFinished;
-        public static int globalStructureVersion = 1;
+        public static int globalStructureVersion = 3;
         public static float requestSize = 0;
         public static ConcurrentQueue<ModInfoThreadRequest> modInfoThreadRequests = new ConcurrentQueue<ModInfoThreadRequest>();
 
@@ -53,6 +60,14 @@ namespace ModioModNetworker.Data
             return false;
         }
 
+        public bool IsBlacklisted() {
+            if (MainClass.blacklistedModIoIds.Contains(modId) || MainClass.blacklistedModIoIds.Contains(numericalId))
+            {
+                return true;
+            }
+            return false;
+        }
+
         public static void HandleQueue()
         {
             // Handle mod info requests
@@ -62,7 +77,7 @@ namespace ModioModNetworker.Data
                 if (modInfoThreadRequests.TryDequeue(out request))
                 {
                     requestSize--;
-                    Make(request.modId, request.json, request.destination);
+                    Make(request.modId, request.json, request.destination, request.originalModInfo);
                     if (requestSize == 0)
                     {
                         onFinished?.Invoke();
@@ -74,7 +89,7 @@ namespace ModioModNetworker.Data
         
         public bool IsSubscribed()
         {
-            return MainClass.subscribedModIoIds.Contains(modId);
+            return MainClass.subscribedModIoNumericalIds.Contains(numericalId);
         }
 
         public bool IsInstalled()
@@ -82,7 +97,15 @@ namespace ModioModNetworker.Data
             bool isInstalled = false;
             foreach (var mod in MainClass.installedMods)
             {
-                if (mod.modId == modId)
+                if (mod.numericalId == numericalId)
+                {
+                    isInstalled = true;
+                    break;
+                }
+            }
+            foreach (var mod in MainClass.untrackedInstalledModInfos)
+            {
+                if (mod.modNumericalId == numericalId)
                 {
                     isInstalled = true;
                     break;
@@ -108,6 +131,27 @@ namespace ModioModNetworker.Data
             thread.Start();
         }
 
+        public static void RequestModInfoNumerical(string modIdNumerical, string destination)
+        {
+            Thread thread = new Thread(() =>
+            {
+                if (modIdNumerical == null) {
+                    MelonLogger.Msg("Mod ID Numerical was null, skipping");
+                    return;
+                }
+                dynamic totalModInfo = ModFileManager.GetRawModInfoJson(modIdNumerical);
+                if (totalModInfo == null) {
+                    return;
+                }
+                string modId = totalModInfo["name_id"];
+                bool mature = totalModInfo["maturity_option"] > 0;
+                string json = ModFileManager.GetJson("@" + modId);
+                modInfoThreadRequests.Enqueue(new ModInfoThreadRequest()
+                { modId = modId, json = json, destination = destination, mature = mature, originalModInfo = totalModInfo});
+            });
+            thread.Start();
+        }
+
         public static ModInfo MakeFromDynamic(dynamic mod, string modId)
         {
             ModInfo modInfo = new ModInfo();
@@ -125,12 +169,17 @@ namespace ModioModNetworker.Data
             return modInfo;
         }
 
-        public static void Make(string modId, string json, string destination)
+        public static void Make(string modId, string json, string destination, dynamic originalModInfo, bool mature = false)
         {
             ModInfo modInfo = new ModInfo();
             modInfo.structureVersion = globalStructureVersion;
             modInfo.modId = modId;
-            Action<ModInfo> action;
+            modInfo.mature = mature;
+            Action<ModInfo> action = new Action<ModInfo>((info =>
+            {
+
+            }));
+
             if (destination == "menuinfos")
             {
                 action = new Action<ModInfo>((info =>
@@ -138,12 +187,69 @@ namespace ModioModNetworker.Data
                     ModlistMenu._modInfos.Add(info);
                 }));
             }
-            else
+            else if (destination == "install_level") {
+                action = new Action<ModInfo>((info =>
+                {
+                    if (MainClass.tempLobbyMods)
+                    {
+                        info.temp = true;
+                    }
+                    ModFileManager.AddToQueue(new DownloadQueueElement()
+                    {
+                        associatedPlayer = null,
+                        info = info,
+                        notify = false
+                    });
+                }));
+            }
+            else if (destination == "install_spawnable")
             {
                 action = new Action<ModInfo>((info =>
                 {
-                    
+                    if (MainClass.tempLobbyMods) {
+                        info.temp = true;
+                    }
+                    ModFileManager.AddToQueue(new DownloadQueueElement()
+                    {
+                        associatedPlayer = null,
+                        info = info,
+                        notify = true
+                    });
                 }));
+            }
+            else if (destination == "install_native")
+            {
+                action = new Action<ModInfo>((info =>
+                {
+                    ModFileManager.AddToQueue(new DownloadQueueElement()
+                    {
+                        associatedPlayer = null,
+                        info = info,
+                        notify = true
+                    });
+                }));
+            }
+            else if (destination.StartsWith("install_avatar"))
+            {
+
+                string id = destination.Split(';')[1];
+                byte idByte = byte.Parse(id);
+                PlayerId playerId = PlayerIdManager.GetPlayerId(idByte);
+                if (playerId != null) {
+                    action = new Action<ModInfo>((info =>
+                    {
+                        if (MainClass.tempLobbyMods)
+                        {
+                            info.temp = true;
+                        }
+                        ModFileManager.AddToQueue(new DownloadQueueElement()
+                        {
+                            associatedPlayer = playerId,
+                            info = info,
+                            notify = false
+                        });
+                    }));
+                }
             }
 
             try
@@ -202,10 +308,27 @@ namespace ModioModNetworker.Data
 
                 if (foundMod != null)
                 {
+                    if (originalModInfo != null) {
+                        // Apply the info we got from the get mod request. This has stuff like the numerical id and the thumbnail link.
+                        string modUrl = originalModInfo["profile_url"];
+                        string numericalId = "" + originalModInfo["id"];
+                        string modTitle = originalModInfo["name"];
+                        string summary = originalModInfo["summary"];
+                        string thumbnailLink = originalModInfo["logo"]["thumb_640x360"];
+
+                        modInfo.modName = modTitle;
+                        modInfo.thumbnailLink = thumbnailLink;
+                        modInfo.modSummary = summary;
+                        modInfo.numericalId = numericalId;
+                    }
+                    
+
                     modInfo.fileSizeKB = foundMod["filesize"];
                     modInfo.directDownloadLink = foundMod["download"]["binary_url"];
                     modInfo.fileName = foundMod["filename"];
                     modInfo.version = ""+foundMod["version"];
+                    
+
                     if (modInfo.version == null)
                     {
                         modInfo.version = "0.0.0";

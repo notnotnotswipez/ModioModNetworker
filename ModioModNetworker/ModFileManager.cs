@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
+using System.Security.Policy;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
@@ -13,7 +14,9 @@ using LabFusion.Representation;
 using LabFusion.Utilities;
 using MelonLoader;
 using ModioModNetworker.Data;
+using ModioModNetworker.Repo;
 using ModioModNetworker.UI;
+using ModIoModNetworker.Ui;
 using SLZ.Marrow.SceneStreaming;
 using SLZ.Marrow.Warehouse;
 using UnityEngine;
@@ -36,6 +39,7 @@ namespace ModioModNetworker
         private static List<DownloadQueueElement> queue = new List<DownloadQueueElement>();
 
         public static bool fetchingSubscriptions = false;
+        public static bool fetchingTrending = false;
 
         public static DownloadAction activeDownloadAction = null;
         public static DownloadQueueElement activeDownloadQueueElement = null;
@@ -54,7 +58,116 @@ namespace ModioModNetworker
         private static void OnDownloadFileCompleted(object sender, AsyncCompletedEventArgs args)
         {
             activeDownloadAction = new DownloadAction(10);
+
+            try
+            {
+                MelonLogger.Msg("Download complete");
+                MelonLogger.Msg("Creating export directory");
+                string exportDirectory = ModFileManager.MOD_FOLDER_PATH.Replace("/", "\\") + "\\" + "tempfolder";
+                if (Directory.Exists(exportDirectory))
+                {
+                    Directory.Delete(exportDirectory, true);
+                }
+
+                Directory.CreateDirectory(exportDirectory);
+                MelonLogger.Msg("Export directory created!");
+                MelonLogger.Msg("Unzipping...");
+                // Unzip using memory stream
+                using (ZipArchive archive = ZipFile.OpenRead(ModFileManager.downloadPath))
+                {
+                    foreach (ZipArchiveEntry entry in archive.Entries)
+                    {
+                        string path = Path.Combine(exportDirectory, entry.FullName);
+                        if (entry.FullName.EndsWith("/"))
+                        {
+                            // Strip last slash
+                            path = path.Substring(0, path.Length - 1);
+                            Directory.CreateDirectory(path);
+                            continue;
+                        }
+                        else
+                        {
+                            // Make sure directory exists
+                            Directory.CreateDirectory(Path.GetDirectoryName(path));
+                        }
+
+                        entry.ExtractToFile(path, true);
+                    }
+                }
+                MelonLogger.Msg("Finished unzipping");
+
+                MelonLogger.Msg("Finding pallet.json files");
+
+                // Pull the first folder out of the zip
+                string palletJsonFile = ModFileManager.FindFile(exportDirectory, "pallet.json");
+
+                while (!palletJsonFile.IsEmpty())
+                {
+                    MelonLogger.Msg("Found pallet.json file");
+                    string modFolder = palletJsonFile.Replace("\\pallet.json", "");
+                    // Make folder in mods folder named after the first directory
+                    string[] split = modFolder.Split('\\');
+                    string modFolderName = split[split.Length - 1];
+                    string modFolderDestination = ModFileManager.MOD_FOLDER_PATH + "/" + modFolderName;
+                    // Make directory in mods folder
+                    JavaScriptSerializer parser = new JavaScriptSerializer();
+
+                    bool existing = false;
+
+                    if (Directory.Exists(modFolderDestination))
+                    {
+                        existing = true;
+                        string existingPalletJson = ModFileManager.FindFile(modFolderDestination, "pallet.json");
+                        string fileContents = File.ReadAllText(existingPalletJson);
+                        var jsonData = parser.Deserialize<dynamic>(fileContents);
+                        string palletId = jsonData["objects"]["o:1"]["barcode"];
+                        MainClass.warehousePalletReloadTargets.Add(palletId);
+                        Directory.Delete(modFolderDestination, true);
+                    }
+
+                    if (!existing)
+                    {
+                        MainClass.warehouseReloadFolders.Add(modFolderDestination);
+                    }
+
+                    MelonLogger.Msg("Moving mod folder...");
+                    Directory.Move(modFolder, modFolderDestination);
+                    MelonLogger.Msg("Finished moving mod folder...");
+                    // Create modinfo.json
+                    string modInfoPath = modFolderDestination + "/modinfo.json";
+                    string modInfoJson = parser.Serialize(ModlistMenu.activeDownloadModInfo);
+                    MelonLogger.Msg("Writing modinfo.json...");
+                    File.WriteAllText(modInfoPath, modInfoJson);
+                    MelonLogger.Msg("Wrote modinfo.json!");
+                    // Add to installed mods
+                    palletJsonFile = ModFileManager.FindFile(exportDirectory, "pallet.json");
+                    MelonLogger.Msg(modFolder + " Downloaded and extracted!");
+                }
+
+                MelonLogger.Msg("Deleting temp.zip");
+                // Delete the zip
+                File.Delete(ModFileManager.downloadPath);
+                MelonLogger.Msg("temp.zip deleted!");
+                // Delete loose folder
+                MelonLogger.Msg("Deleting loose folder!");
+                Directory.Delete(exportDirectory, true);
+                MelonLogger.Msg("Loose folder deleted!");
+               
+                MainClass.warehouseReloadRequested = true;
+                MainClass.refreshInstalledModsRequested = true;
+                MainClass.subsChanged = true;
+                _client.Dispose();
+            }
+            catch (Exception e)
+            {
+                MelonLogger.Error($"Error while downloading mod {ModlistMenu.activeDownloadModInfo.modId}: " + e);
+                ModFileManager.isDownloading = false;
+                ModFileManager.activeDownloadQueueElement = null;
+                ModlistMenu.activeDownloadModInfo = null;
+                _client.Dispose();
+            }
         }
+       
 
         public static string FindFile(string path, string fileName)
         {
@@ -172,6 +285,10 @@ namespace ModioModNetworker
                     return false;
                 }
             }
+
+            if (modInfo.mature && !MainClass.downloadMatureContent) {
+                return false;
+            }
             
             if (modInfo.version == null)
             {
@@ -182,7 +299,7 @@ namespace ModioModNetworker
             bool outdated = false;
             foreach (var mod in MainClass.installedMods)
             {
-                if (mod.modId == modInfo.modId)
+                if (mod.numericalId == modInfo.numericalId || mod.modId == modInfo.modId)
                 {
                     isInstalled = true;
                     if (mod.version != modInfo.version)
@@ -202,7 +319,7 @@ namespace ModioModNetworker
             // Check if mod is already in queue
             foreach (var mod in queue)
             {
-                if (mod.info.modId == modInfo.modId)
+                if (mod.info.modId == modInfo.modId || mod.info.numericalId == modInfo.numericalId)
                 {
                     return false;
                 }
@@ -211,6 +328,32 @@ namespace ModioModNetworker
             MelonLogger.Msg("Added: " + modInfo.modId + " to install queue");
             queue.Add(queueElement);
             return true;
+        }
+
+        public static async Task DownloadFileAsync(string url, string path)
+        {
+            HttpWebRequest request = (HttpWebRequest) WebRequest.Create(url);
+            request.Method = "GET";
+            request.ContentType = "application/octet-stream";
+            request.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
+
+            HttpWebResponse response = await request.GetResponseAsync() as HttpWebResponse;
+
+            if (response.StatusCode == HttpStatusCode.OK)
+            {
+                using (Stream stream = response.GetResponseStream())
+                {
+                    using (FileStream fs = new FileStream(path, FileMode.CreateNew))
+                    {
+                        await stream.CopyToAsync(fs);
+
+                    }
+                }
+            }
+            else
+            {
+                MelonLogger.Error("Failed to download file");
+            }
         }
 
         public static void DownloadFile(string url, string path)
@@ -225,7 +368,6 @@ namespace ModioModNetworker
             try
             {
                 _client.DownloadFileAsync(new Uri(url), path);
-
             }
             catch (WebException e)
             {
@@ -250,11 +392,19 @@ namespace ModioModNetworker
             {
                 try
                 {
-                    WebClient client = new WebClient();
-                    client.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
-                    MainClass.subscriptionThreadString =
-                        client.DownloadString("https://api.mod.io/v1/me/subscribed?_offset=" + shown + "&limit=400");
+                    HttpWebRequest httpWebRequest = (HttpWebRequest) WebRequest.Create("https://api.mod.io/v1/me/subscribed?_offset=" + shown + "&limit=400");
+                    httpWebRequest.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
+                    HttpWebResponse httpWebresponse = (HttpWebResponse) httpWebRequest.GetResponse();
+                    StreamReader streamReader = new StreamReader(httpWebresponse.GetResponseStream());
+                    string result = streamReader.ReadToEnd();
+
+                    MainClass.subscriptionThreadString = result;
+
+                    httpWebresponse.Close();
+                    streamReader.Close();
+
                     fetchingSubscriptions = false;
+
                 }
                 catch (WebException e)
                 {
@@ -265,31 +415,86 @@ namespace ModioModNetworker
             thread.Start();
         }
 
+        public static void QueueTrending(int offset, string searchQuery = "") {
+
+            if (fetchingTrending)
+            {
+                return;
+            }
+
+            fetchingTrending = true;
+
+            Thread thread = new Thread(() =>
+            {
+                try
+                {
+                    string extension = "&_q="+searchQuery;
+                    if (searchQuery.IsEmpty()) {
+                        extension = "";
+                    }
+                    HttpWebRequest httpWebRequest = (HttpWebRequest) WebRequest.Create($"https://mod.io/v1/games/@bonelab/mods?_limit=100&_offset={offset}&_sort=-popular"+ extension);
+                    httpWebRequest.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
+                    HttpWebResponse httpWebresponse = (HttpWebResponse) httpWebRequest.GetResponse();
+                    StreamReader streamReader = new StreamReader(httpWebresponse.GetResponseStream());
+                    string result = streamReader.ReadToEnd();
+
+                    MainClass.trendingThreadString = result;
+
+                    httpWebresponse.Close();
+                    streamReader.Close();
+
+                    fetchingTrending = false;
+
+                }
+                catch (WebException e)
+                {
+                    fetchingTrending = false;
+                    MelonLogger.Error("Failed to get trending mods: " + e.Message);
+                }
+            });
+            thread.Start();
+        }
 
 
-        public static bool Subscribe(string modId)
+
+        public static bool Subscribe(string numericalid)
         {
-            string url = "https://api.mod.io/v1/games/3809/mods/@" + modId + "/subscribe";
+            string url = "https://api.mod.io/v1/games/3809/mods/" + numericalid + "/subscribe";
 
             // Make https request to subscribe
-            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-            request.Method = "POST";
-            request.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
-            request.ContentType = "application/x-www-form-urlencoded";
-            try
+            Thread thread = new Thread(() =>
             {
-                HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-                if (response.StatusCode == HttpStatusCode.Created)
+                HttpWebRequest request = (HttpWebRequest) WebRequest.Create(url);
+                request.Method = "POST";
+                request.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
+                request.ContentType = "application/x-www-form-urlencoded";
+
+                try
                 {
-                    MelonLogger.Msg("Subscribed to mod: " + modId);
-                    return true;
+                    HttpWebResponse response = (HttpWebResponse) request.GetResponse();
+                    if (response.StatusCode == HttpStatusCode.Created)
+                    {
+                        response.Close();
+                        MainThreadManager.QueueAction(() =>
+                        {
+                            if (NetworkerMenuController.instance)
+                            {
+                                NetworkerMenuController.instance.UpdateModPopupButtons();
+                            }
+                        });
+                    }
+                    else
+                    {
+                        response.Close();
+                    }
                 }
-            }
-            catch (WebException e)
-            {
-                MelonLogger.Error("Failed to subscribe to mod: " + modId);
-                MelonLogger.Error(e.Message);
-            }
+                catch (WebException e)
+                {
+                    MelonLogger.Error("Failed to subscribe to mod: " + numericalid);
+                    MelonLogger.Error(e.Message);
+                }
+            });
+            thread.Start();
 
             return false;
         }
@@ -300,53 +505,107 @@ namespace ModioModNetworker
             UnSubscribe(modId);
         }
 
-        public static void UnSubscribe(string modId)
+        public static void UnSubscribe(string numericalId)
         {
-            string url = "https://api.mod.io/v1/games/3809/mods/@" + modId + "/subscribe";
-
+            string url = "https://api.mod.io/v1/games/3809/mods/" + numericalId + "/subscribe";
+            MainClass.subscribedModIoNumericalIds.Remove(numericalId);
             // Make https request to unsubscribe
-            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-            request.Method = "DELETE";
-            request.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
-            request.ContentType = "application/x-www-form-urlencoded";
-            // Send request
-            try
+
+            Thread thread = new Thread(() =>
             {
-                HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-                if (response.StatusCode == HttpStatusCode.NoContent)
+                HttpWebRequest request = (HttpWebRequest) WebRequest.Create(url);
+                request.Method = "DELETE";
+                request.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
+                request.ContentType = "application/x-www-form-urlencoded";
+                // Send request
+                try
                 {
-                    MelonLogger.Msg("Unsubscribed from mod: " + modId);
+                    HttpWebResponse response = (HttpWebResponse) request.GetResponse();
+
+                    if (response.StatusCode == HttpStatusCode.NoContent)
+                    {
+                        response.Close();
+                        MainThreadManager.QueueAction(() =>
+                        {
+                            if (NetworkerMenuController.instance)
+                            {
+                                NetworkerMenuController.instance.UpdateModPopupButtons();
+                            }
+                        });
+                    }
+                    else
+                    {
+                        response.Close();
+                    }
                 }
-            }
-            catch (WebException e)
-            {
-                MelonLogger.Error("Failed to unsubscribe from mod: " + modId);
-                MelonLogger.Error(e.Message);
-            }
+                catch (WebException e)
+                {
+                    MelonLogger.Error("Failed to unsubscribe from mod: " + numericalId);
+                    MelonLogger.Error(e.Message);
+                }
+            });
+
+            thread.Start();
         }
 
-        public static void UnInstall(string modId)
+        public static void UnInstall(string numericalId)
         {
             InstalledModInfo installedModInfo = null;
+            RepoModInfo repoModInfo = null;
+
             foreach (var modInfo in MainClass.InstalledModInfos)
             {
-                if (modInfo.modId == modId)
+                if (modInfo.ModInfo.numericalId == numericalId)
                 {
                     installedModInfo = modInfo;
                 }
             }
 
-            if (installedModInfo != null)
+            foreach (var repoInfo in MainClass.untrackedInstalledModInfos)
             {
-                AssetWarehouse.Instance.UnloadPallet(installedModInfo.palletBarcode);
-                // Delete mod folder
-                string modJsonPath = installedModInfo.modinfoJsonPath;
-                // Get the directory containing the modinfo.json
-                string folder = modJsonPath.Replace("\\modinfo.json", "");
-                Directory.Delete(folder, true);
+                if (repoInfo.modNumericalId == numericalId)
+                {
+                    repoModInfo = repoInfo;
+                }
             }
-            
-            MainClass.refreshInstalledModsRequested = true;
+
+            Thread thread = new Thread(() =>
+            {
+                if (installedModInfo != null)
+                {
+                    string barcode = installedModInfo.palletBarcode;
+                    MainThreadManager.QueueAction(() =>
+                    {
+                        
+                        AssetWarehouse.Instance.UnloadPallet(barcode);
+                    });
+                    
+                    // Delete mod folder
+                    string modJsonPath = installedModInfo.modinfoJsonPath;
+                    // Get the directory containing the modinfo.json
+                    string folder = modJsonPath.Replace("\\modinfo.json", "");
+                    Directory.Delete(folder, true);
+                }
+
+                if (repoModInfo != null)
+                {
+                    string barcode = repoModInfo.palletBarcode;
+                    MainThreadManager.QueueAction(() =>
+                    {
+                        AssetWarehouse.Instance.UnloadPallet(barcode);
+                    });
+                    
+                    // Delete mod folder
+                    string palletJsonPath = repoModInfo.palletJsonPath;
+                    // Get the directory containing the modinfo.json
+                    string folder = palletJsonPath.Replace("\\pallet.json", "");
+                    Directory.Delete(folder, true);
+                }
+
+                MainClass.refreshInstalledModsRequested = true;
+            });
+
+            thread.Start();
         }
 
         public static string GetJson(string mod)
@@ -354,13 +613,17 @@ namespace ModioModNetworker
             string json = "";
             try
             {
-                // Make new client
-                WebClient client = new WebClient();
-                // Add auth header
-                client.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
                 // Make an https request to the mod.io api
                 string link = API_PATH + mod + "/files";
-                json = client.DownloadString(link);
+                HttpWebRequest httpWebRequest = (HttpWebRequest) WebRequest.Create(link);
+                httpWebRequest.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
+                HttpWebResponse httpWebresponse = (HttpWebResponse) httpWebRequest.GetResponse();
+                StreamReader streamReader = new StreamReader(httpWebresponse.GetResponseStream());
+                string result = streamReader.ReadToEnd();
+                httpWebresponse.Close();
+                streamReader.Close();
+
+                json = result;
             }
             catch (Exception e)
             {
@@ -370,133 +633,71 @@ namespace ModioModNetworker
 
             return json;
         }
-    }
 
-    public class DownloadQueueElement
-    {
-        public PlayerId associatedPlayer;
-        public ModInfo info;
-        public bool notify = true;
-    }
-
-    public class DownloadAction
-    {
-        public int delayFrames;
-
-        public DownloadAction(int delayFrames)
+        public static dynamic GetRawModInfoJson(string mod)
         {
-            this.delayFrames = delayFrames;
-        }
-
-        public bool Check()
-        {
-            if (delayFrames > 0)
+            string json = "";
+            try
             {
-                delayFrames--;
-                return false;
+                // Make new client
+                WebClient client = new WebClient();
+                // Add auth header
+                client.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
+                // Make an https request to the mod.io api
+                string link = API_PATH + mod;
+                json = client.DownloadString(link);
+            }
+            catch (Exception e)
+            {
+                MelonLogger.Error($"Error when fetching raw mod info for {mod}: ");
+                MelonLogger.Error(e);
             }
 
-            return true;
-        }
+            JavaScriptSerializer serializer = new JavaScriptSerializer();
+            dynamic dynamicJson = serializer.Deserialize<dynamic>(json);
 
-        public void Handle()
+
+            return dynamicJson;
+        }
+    }
+}
+
+public class DownloadQueueElement
+{
+    public PlayerId associatedPlayer;
+    public ModInfo info;
+    public bool notify = true;
+}
+
+public class DownloadAction
+{
+    public int delayFrames;
+
+    public DownloadAction(int delayFrames)
+    {
+        this.delayFrames = delayFrames;
+    }
+
+    public bool Check()
+    {
+        if (delayFrames > 0)
         {
-            Thread otherThread = new Thread(() =>
-            {
-                try
-                {
-                    string exportDirectory = ModFileManager.MOD_FOLDER_PATH.Replace("/", "\\") + "\\" + "tempfolder";
-                    if (Directory.Exists(exportDirectory))
-                    {
-                        Directory.Delete(exportDirectory, true);
-                    }
-
-                    Directory.CreateDirectory(exportDirectory);
-
-                    // Unzip using memory stream
-                    using (ZipArchive archive = ZipFile.OpenRead(ModFileManager.downloadPath))
-                    {
-                        foreach (ZipArchiveEntry entry in archive.Entries)
-                        {
-                            string path = Path.Combine(exportDirectory, entry.FullName);
-                            if (entry.FullName.EndsWith("/"))
-                            {
-                                // Strip last slash
-                                path = path.Substring(0, path.Length - 1);
-                                Directory.CreateDirectory(path);
-                                continue;
-                            }
-                            else
-                            {
-                                // Make sure directory exists
-                                Directory.CreateDirectory(Path.GetDirectoryName(path));
-                            }
-
-                            entry.ExtractToFile(path, true);
-                        }
-                    }
-
-                    // Pull the first folder out of the zip
-                    string palletJsonFile = ModFileManager.FindFile(exportDirectory, "pallet.json");
-
-                    while (!palletJsonFile.IsEmpty())
-                    {
-                        string modFolder = palletJsonFile.Replace("\\pallet.json", "");
-                        // Make folder in mods folder named after the first directory
-                        string[] split = modFolder.Split('\\');
-                        string modFolderName = split[split.Length - 1];
-                        string modFolderDestination = ModFileManager.MOD_FOLDER_PATH + "/" + modFolderName;
-                        // Make directory in mods folder
-                        JavaScriptSerializer parser = new JavaScriptSerializer();
-
-                        bool existing = false;
-
-                        if (Directory.Exists(modFolderDestination))
-                        {
-                            existing = true;
-                            string existingPalletJson = ModFileManager.FindFile(modFolderDestination, "pallet.json");
-                            string fileContents = File.ReadAllText(existingPalletJson);
-                            var jsonData = parser.Deserialize<dynamic>(fileContents);
-                            string palletId = jsonData["objects"]["o:1"]["barcode"];
-                            MainClass.warehousePalletReloadTargets.Add(palletId);
-                            Directory.Delete(modFolderDestination, true);
-                        }
-
-                        if (!existing)
-                        {
-                            MainClass.warehouseReloadFolders.Add(modFolderDestination);
-                        }
-
-                        Directory.Move(modFolder, modFolderDestination);
-                        // Create modinfo.json
-                        string modInfoPath = modFolderDestination + "/modinfo.json";
-                        string modInfoJson = parser.Serialize(ModlistMenu.activeDownloadModInfo);
-                        File.WriteAllText(modInfoPath, modInfoJson);
-
-                        palletJsonFile = ModFileManager.FindFile(exportDirectory, "pallet.json");
-                        MelonLogger.Msg(modFolder + " Downloaded and extracted!");
-                    }
-
-                    // Delete the zip
-                    File.Delete(ModFileManager.downloadPath);
-                    // Delete loose folder
-                    Directory.Delete(exportDirectory);
-                    MainClass.warehouseReloadRequested = true;
-                    MainClass.refreshInstalledModsRequested = true;
-                    MainClass.subsChanged = true;
-
-                }
-                catch (Exception e)
-                {
-                    MelonLogger.Error($"Error while downloading mod {ModlistMenu.activeDownloadModInfo.modId}: " + e);
-                    ModFileManager.isDownloading = false;
-                    ModFileManager.activeDownloadQueueElement = null;
-                    ModlistMenu.activeDownloadModInfo = null;
-
-                }
-            });
-            otherThread.Start();
+            delayFrames--;
+            return false;
         }
+
+        return true;
+    }
+
+    public void Handle()
+    {
+        /*Thread otherThread = new Thread(() =>
+        {
+            try
+            {
+
+        });
+        otherThread.Start();*/
     }
 }
 

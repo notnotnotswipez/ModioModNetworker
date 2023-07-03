@@ -5,12 +5,31 @@ using LabFusion.Representation;
 using LabFusion.Senders;
 using MelonLoader;
 using ModioModNetworker.Data;
+using ModioModNetworker.Repo;
 using SLZ.Marrow.SceneStreaming;
 
 namespace ModioModNetworker.Patches
 {
     public class AvatarSwitchPatch
     {
+        [HarmonyPatch(typeof(PlayerRep), "OnSwapAvatar")]
+        public class OnRepSwapAvatarPatch {
+            public static void Postfix(PlayerRep __instance, bool success) {
+                if (!success && MainClass.useRepo && MainClass.autoDownloadAvatars)
+                {
+                    string avatarBarcode = __instance.avatarId;
+                    string palletBarcode = RepoManager.GetPalletBarcodeFromCrateBarcode(avatarBarcode);
+
+                    string existingNumericalId = RepoManager.GetRepoModInfoFromPalletBarcode(palletBarcode).modNumericalId;
+                    if (existingNumericalId != null)
+                    {
+                        ModInfo.RequestModInfoNumerical(existingNumericalId, "install_avatar;"+__instance.PlayerId.SmallId);
+
+                    }
+                }
+            }
+        }
+
 
         [HarmonyPatch(typeof(PlayerSender), "SendPlayerAvatar")]
         public static class PlayerSenderPatch

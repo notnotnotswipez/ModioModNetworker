@@ -1,10 +1,14 @@
 using System.Collections.Generic;
 using BoneLib.BoneMenu;
 using BoneLib.BoneMenu.Elements;
+using BoneLib.BoneMenu.UI;
+using HarmonyLib;
 using LabFusion.Network;
 using LabFusion.Utilities;
 using MelonLoader;
 using ModioModNetworker.Data;
+using ModioModNetworker.Utilities;
+using ModIoModNetworker.Ui;
 using UnityEngine;
 
 namespace ModioModNetworker
@@ -28,10 +32,111 @@ namespace ModioModNetworker
         private static int modsPerPage = 4;
         
         public static ModInfo activeDownloadModInfo;
+        public static GameObject customMenuObject;
+
+        [HarmonyPatch(typeof(UIManager), "OnCategoryUpdated")]
+        public class CategoryUpdatePatch
+        {
+            public static void Postfix(UIManager __instance, MenuCategory category)
+            {
+                if (category == mainCategory)
+                {
+                    __instance.MainPage.transform.Find("ScrollDown").gameObject.SetActive(false);
+                    __instance.MainPage.transform.Find("ScrollUp").gameObject.SetActive(false);
+                    __instance.MainPage.transform.Find("Return").gameObject.SetActive(false);
+
+                    if (!customMenuObject)
+                    {
+                        GameObject customMenu = GameObject.Instantiate(NetworkerAssets.uiMenuPrefab);
+                        customMenu.transform.Find("MenuBase").gameObject.AddComponent<NetworkerMenuController>();
+                        customMenu.transform.parent = __instance.MainPage.transform;
+                        customMenu.transform.localPosition = Vector3.forward;
+                        customMenu.transform.localRotation = Quaternion.identity;
+                        customMenu.transform.localScale = Vector3.one;
+                        customMenuObject = customMenu;
+                    }
+                    else {
+                        customMenuObject.SetActive(true);
+                    }
+                }
+                else if (category == MenuManager.RootCategory){
+                    __instance.MainPage.transform.Find("ScrollDown").gameObject.SetActive(true);
+                    __instance.MainPage.transform.Find("ScrollUp").gameObject.SetActive(true);
+                    __instance.MainPage.transform.Find("Return").gameObject.SetActive(true);
+                    if (customMenuObject) {
+                        customMenuObject.SetActive(false);
+                        NetworkerMenuController.instance.Reset();
+                    }
+                }
+            }
+        }
 
         public static void Initialize()
         {
             mainCategory = MenuManager.CreateCategory("ModIo Mod Networker", Color.cyan);
+                NetworkerMenuController.AddCheckboxSetting("Auto Delete Lobby Mods", MainClass.tempLobbyMods,
+                (b) =>
+                {
+                    MainClass.tempLobbyMods = b;
+                    MainClass.tempLobbyModsConfig.Value = b;
+                    MainClass.melonPreferencesCategory.SaveToFile();
+                });
+
+            NetworkerMenuController.AddCheckboxSetting("Auto Download Avatars", MainClass.autoDownloadAvatars,
+                (b) =>
+                {
+                    MainClass.autoDownloadAvatars = b;
+                    MainClass.autoDownloadAvatarsConfig.Value = b;
+                    MainClass.melonPreferencesCategory.SaveToFile();
+                });
+
+            NetworkerMenuController.AddCheckboxSetting("Auto Download Spawnables", MainClass.autoDownloadSpawnables,
+                (b) =>
+                {
+                    MainClass.autoDownloadSpawnables = b;
+                    MainClass.autoDownloadSpawnablesConfig.Value = b;
+                    MainClass.melonPreferencesCategory.SaveToFile();
+                });
+
+            NetworkerMenuController.AddCheckboxSetting("Auto Download Levels", MainClass.autoDownloadLevels,
+                (b) =>
+                {
+                    MainClass.autoDownloadLevels = b;
+                    MainClass.autoDownloadLevelsConfig.Value = b;
+                    MainClass.melonPreferencesCategory.SaveToFile();
+                });
+
+            NetworkerMenuController.AddCheckboxSetting("Use Repository", MainClass.useRepo,
+                (b) =>
+                {
+                    MainClass.useRepo = b;
+                    MainClass.useRepoConfig.Value = b;
+                    MainClass.melonPreferencesCategory.SaveToFile();
+                });
+
+            NetworkerMenuController.AddNumericalSetting("(Spawnable/Avatar) Auto Download Max MB", (int) MainClass.maxAutoDownloadMb, 200, 2000, 100,
+                (num) =>
+                {
+                    MainClass.maxAutoDownloadMb = num;
+                    MainClass.maxAutoDownloadMbConfig.Value = num;
+                    MainClass.melonPreferencesCategory.SaveToFile();
+                });
+
+            NetworkerMenuController.AddNumericalSetting("(Level) Auto Download Max GB", (int) MainClass.levelMaxGb, 1, 10, 1,
+                (num) =>
+                {
+                    MainClass.levelMaxGb = num;
+                    MainClass.maxLevelAutoDownloadGbConfig.Value = num;
+                    MainClass.melonPreferencesCategory.SaveToFile();
+                });
+
+            NetworkerMenuController.AddCheckboxSetting("Auto Download 18+ Content", MainClass.downloadMatureContent,
+                (b) =>
+                {
+                    MainClass.downloadMatureContent = b;
+                    MainClass.downloadMatureContentConfig.Value = b;
+                    MainClass.melonPreferencesCategory.SaveToFile();
+                });
             MainClass.menuRefreshRequested = true;
         }
 
@@ -55,6 +160,8 @@ namespace ModioModNetworker
             installPageCount = Mathf.CeilToInt(MainClass.installedMods.Count / (float) modsPerPage);
             hostPageCount = Mathf.CeilToInt(_modInfos.Count / (float) modsPerPage);
             mainCategory.Elements.Clear();
+
+            return;
 
             if (activeDownloadModInfo != null)
             {
@@ -481,13 +588,13 @@ namespace ModioModNetworker
                     {
                         modInfoButton.CreateFunctionElement("Subscribe", Color.cyan, () =>
                         {
-                            if (ModFileManager.Subscribe(modInfo.modId))
+                            if (ModFileManager.Subscribe(modInfo.numericalId))
                             {
-                                MainClass.subscribedModIoIds.Add(modInfo.modId);
+                                MainClass.subscribedModIoNumericalIds.Add(modInfo.numericalId);
                                 Refresh(true);
                                 FusionNotifier.Send(new FusionNotification()
                                 {
-                                    title = new NotificationText("Subscribed to "+modInfo.modId),
+                                    title = new NotificationText("Subscribed to "+modInfo.modName),
                                     showTitleOnPopup = true,
                                     message = new NotificationText("This is now in your mod.io subscribed list."),
                                     popupLength = 3f,

@@ -46,6 +46,7 @@
     <Reference Include="Il2Cppmscorlib">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\Managed\Il2Cppmscorlib.dll</HintPath>
     </Reference>
+    <Reference Include="Il2CppSystem, Version=4.0.0.0, Culture=neutral, PublicKeyToken=null" />
     <Reference Include="LabFusion">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\Mods\LabFusion.dll</HintPath>
     </Reference>
@@ -486,12 +487,25 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Queue\LevelHoldQueue.cs" />
     <Compile Include="Queue\SpawnableHoldQueue.cs" />
+    <Compile Include="Repo\RepoManager.cs" />
     <Compile Include="UI\AvatarDownloadBar.cs" />
+    <Compile Include="UI\KeyboardManager.cs" />
+    <Compile Include="UI\MainThreadManager.cs" />
+    <Compile Include="UI\NumericalSetting.cs" />
+    <Compile Include="UI\CheckboxSetting.cs" />
+    <Compile Include="UI\GenericSetting.cs" />
+    <Compile Include="UI\ModInfoDisplay.cs" />
+    <Compile Include="UI\NetworkerMenuController.cs" />
+    <Compile Include="UI\ThumbnailThreader.cs" />
+    <Compile Include="Utilities\ActionProcessor.cs" />
     <Compile Include="Utilities\ModInfoUtilities.cs" />
     <Compile Include="Utilities\ResourceHelpers.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\networker.assets" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\networkermenu.networker" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
