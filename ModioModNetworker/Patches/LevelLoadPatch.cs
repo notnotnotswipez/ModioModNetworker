@@ -80,7 +80,6 @@ namespace ModioModNetworker.Patches
                             writer.Write(data);
                             using (var message = FusionMessage.ModuleCreate<ModlistMessage>(writer))
                             {
-                                MelonLogger.Msg("Sending level mod info to player!");
                                 MessageSender.SendFromServer(userId, NetworkChannel.Reliable, message);
                             }
                         }
@@ -105,7 +104,6 @@ namespace ModioModNetworker.Patches
                             writer.Write(data);
                             using (var message = FusionMessage.ModuleCreate<ModlistMessage>(writer))
                             {
-                                MelonLogger.Msg("Sending level mod info to server");
                                 MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
                             }
                         }

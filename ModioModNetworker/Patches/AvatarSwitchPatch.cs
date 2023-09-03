@@ -7,6 +7,7 @@ using MelonLoader;
 using ModioModNetworker.Data;
 using ModioModNetworker.Repo;
 using SLZ.Marrow.SceneStreaming;
+using SLZ.Marrow.Warehouse;
 
 namespace ModioModNetworker.Patches
 {
@@ -17,14 +18,22 @@ namespace ModioModNetworker.Patches
             public static void Postfix(PlayerRep __instance, bool success) {
                 if (!success && MainClass.useRepo && MainClass.autoDownloadAvatars)
                 {
+                    string name;
+                    __instance.PlayerId.TryGetDisplayName(out name);
                     string avatarBarcode = __instance.avatarId;
                     string palletBarcode = RepoManager.GetPalletBarcodeFromCrateBarcode(avatarBarcode);
+                    RepoModInfo repoModInfo = RepoManager.GetRepoModInfoFromPalletBarcode(palletBarcode);
 
-                    string existingNumericalId = RepoManager.GetRepoModInfoFromPalletBarcode(palletBarcode).modNumericalId;
-                    if (existingNumericalId != null)
+                    if (repoModInfo != null)
                     {
-                        ModInfo.RequestModInfoNumerical(existingNumericalId, "install_avatar;"+__instance.PlayerId.SmallId);
-
+                        string existingNumericalId = repoModInfo.modNumericalId;
+                        if (existingNumericalId != null)
+                        {
+                            ModInfo.RequestModInfoNumerical(existingNumericalId, "install_avatar;" + __instance.PlayerId.SmallId);
+                        }
+                    }
+                    else {
+                        MelonLogger.Error("We DO NOT have any repo information on: " + palletBarcode);
                     }
                 }
             }
@@ -65,7 +74,6 @@ namespace ModioModNetworker.Patches
                                 writer.Write(data);
                                 using (var message = FusionMessage.ModuleCreate<ModlistMessage>(writer))
                                 {
-                                    MelonLogger.Msg("Sending avatar mod info to server");
                                     MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
                                 }
                             }

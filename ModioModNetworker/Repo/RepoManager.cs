@@ -1,11 +1,11 @@
-﻿using MelonLoader;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Security.Policy;
-using System.Text;
-using System.Threading.Tasks;
-using System.Web.Script.Serialization;
+using System.IO;
+using System.Net;
+using MelonLoader;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Schema;
+using UnityEngine.Networking;
 
 namespace ModioModNetworker.Repo
 {
@@ -15,54 +15,79 @@ namespace ModioModNetworker.Repo
         public static Dictionary<string, RepoModInfo> barcodeModIdPair = new Dictionary<string, RepoModInfo>();
         public static Dictionary<string, string> modIdToBarcode = new Dictionary<string, string>();
 
+        
+        
         public static void LoadBarcodePairsFromRepos()
         {
-            JavaScriptSerializer javaSerializer = new JavaScriptSerializer();
-            javaSerializer.MaxJsonLength = int.MaxValue;
-            javaSerializer.RecursionLimit = int.MaxValue;
-            
             foreach (string repo in repos)
             {
-                using (System.Net.WebClient webClient = new System.Net.WebClient())
+                
+                UnityWebRequest httpWebRequest = UnityWebRequest.Get(repo);
+                httpWebRequest.SendWebRequest();
+
+                while (!httpWebRequest.isDone)
                 {
-                    string repoInformation = webClient.DownloadString(repo);
+                    
+                }
 
-                    dynamic repoDynamic = javaSerializer.Deserialize<dynamic>(repoInformation);
-                    foreach (dynamic item in repoDynamic["objects"]["o:1"]["mods"]) {
-                        string refName = item["ref"];
-                        dynamic modObject = repoDynamic["objects"][refName];
+                if (httpWebRequest.result == UnityWebRequest.Result.ConnectionError || httpWebRequest.result == UnityWebRequest.Result.ProtocolError)
+                {
+                    continue;
+                }
 
-                        string barcode = modObject["barcode"];
-                        if (barcode != null)
-                        { 
-                            string thumbLink = modObject["thumbnailUrl"];
-                            string stripped = thumbLink.Replace("https://thumb.modcdn.io/mods", "");
-                            string[] parts = stripped.Split('/');
-                            string modIdDirect = parts[2];
-                            string modName = modObject["title"];
+                string repoInformation = httpWebRequest.downloadHandler.text;
 
-                            // Who needs regex anyway.....
-                            string[] split = modName.Split(new string[] { "/size>" }, StringSplitOptions.RemoveEmptyEntries);
-                            string[] secondSplit = split[1].Split(new string[] { "<mspace" }, StringSplitOptions.RemoveEmptyEntries);
+                /*HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create(repo);
+                HttpWebResponse httpWebresponse = (HttpWebResponse)httpWebRequest.GetResponse();
+                StreamReader streamReader = new StreamReader(httpWebresponse.GetResponseStream());
+                string repoInformation = streamReader.ReadToEnd();*/
 
-                            string safeName = secondSplit[0].Trim();
-                            string version = modObject["version"];
+                dynamic repoDynamic = JsonConvert.DeserializeObject<dynamic>(repoInformation, new JsonSerializerSettings
+                {
+                    MaxDepth = int.MaxValue
+                });
 
-                            RepoModInfo repoModInfo = new RepoModInfo()
-                            {
-                                modNumericalId = modIdDirect,
-                                thumbnailLink = thumbLink,
-                                summary = modObject["description"],
-                                modName = safeName,
-                                version = version,
-                                palletBarcode = barcode
-                            };
+                foreach (dynamic item in repoDynamic["objects"]["o:1"]["mods"])
+                {
+                    string refName = (string) item["ref"];
+                    dynamic modObject = repoDynamic["objects"][refName];
 
-                            if (!barcodeModIdPair.ContainsKey(barcode)) {
-                                barcodeModIdPair.Add(barcode, repoModInfo);
-                            }
-                            modIdToBarcode.Add(modIdDirect, barcode);
+                    string barcode = (string) modObject["barcode"];
+                    if (barcode != null)
+                    {
+                        string thumbLink = (string) modObject["thumbnailUrl"];
+                        string stripped = thumbLink.Replace("https://thumb.modcdn.io/mods", "");
+                        string[] parts = stripped.Split('/');
+                        string modIdDirect = parts[2];
+                        string modName = (string) modObject["title"];
+
+                        // Who needs regex anyway.....
+                        string[] split = modName.Split(new string[] { "/size>" },
+                            StringSplitOptions.RemoveEmptyEntries);
+                        string[] secondSplit = split[1].Split(new string[] { "<mspace" },
+                            StringSplitOptions.RemoveEmptyEntries);
+
+                        string safeName = secondSplit[0].Trim();
+                        string version = (string) modObject["version"];
+
+                        RepoModInfo repoModInfo = new RepoModInfo()
+                        {
+                            modNumericalId = modIdDirect,
+                            thumbnailLink = thumbLink,
+                            summary = (string) modObject["description"],
+                            modName = safeName,
+                            version = version,
+                            palletBarcode = barcode
+                        };
+
+
+
+                        if (!barcodeModIdPair.ContainsKey(barcode))
+                        {
+                            barcodeModIdPair.Add(barcode, repoModInfo);
                         }
+
+                        modIdToBarcode.Add(modIdDirect, barcode);
                     }
                 }
             }

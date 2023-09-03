@@ -1,5 +1,6 @@
 using System;
 using System.Security.Policy;
+using MelonLoader;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -28,14 +29,10 @@ namespace ModioModNetworker.Utilities
         public static GameObject checkboxSettingPrefab;
         public static GameObject numericalSettingPrefab;
 
-        public static void LoadAssets(AssetBundle bundle)
-        {
-            avatarDownloadBarPrefab =
-                bundle.LoadPersistentAsset<GameObject>("assets/networkerui/avatarprogressbar.prefab");
-        }
-
         public static void LoadAssetsUI(AssetBundle bundle)
         {
+            avatarDownloadBarPrefab =
+                bundle.LoadPersistentAsset<GameObject>("assets/networkerassets/avatarprogressbar.prefab");
             uiMenuPrefab =
                 bundle.LoadPersistentAsset<GameObject>("assets/networkerassets/rootmenu.prefab");
             modInfoDisplay =

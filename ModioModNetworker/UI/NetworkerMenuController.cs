@@ -12,7 +12,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web.WebPages;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
@@ -107,6 +106,16 @@ namespace ModIoModNetworker.Ui
             Button backButton = transform.Find("BackButton").GetComponent<Button>();
             backButton.onClick.AddListener(new Action(() => {
                 MenuManager.SelectCategory(MenuManager.RootCategory);
+            }));
+
+            Button uninstallUnsubscribedConfirm = filesTab.transform.Find("Confirmer").Find("Confirm").Find("Button").GetComponent<Button>();
+            uninstallUnsubscribedConfirm.onClick.AddListener(new Action(() => {
+                foreach (var modInfo in totalInstalled)
+                {
+                    if (!modInfo.IsSubscribed()) {
+                        ModFileManager.UnInstallMainThread(modInfo.numericalId);
+                    }
+                }
             }));
 
             Button installAllConfirm = multiplayerTab.transform.Find("Confirmer").Find("Confirm").Find("Button").GetComponent<Button>();
@@ -255,6 +264,12 @@ namespace ModIoModNetworker.Ui
             ChangePanel(Panels.FILES);
         }
 
+        public void Refresh() {
+            if (selectedPanel == Panels.FILES) {
+                SetFilterMode(chosenSort);
+            }
+        }
+
         public static void SetHostSubscribedMods(List<ModInfo> modInfos) {
             host.Clear();
             host.AddRange(modInfos);
@@ -278,14 +293,13 @@ namespace ModIoModNetworker.Ui
                 {
                     ModFileManager.UnInstall(viewedInfo.numericalId);
                 }
+                MainClass.subscribedModIoNumericalIds.Remove(viewedInfo.numericalId);
             }
             else {
                 if (!MainClass.subscribedModIoNumericalIds.Contains(viewedInfo.numericalId)) {
                     MainClass.subscribedModIoNumericalIds.Add(viewedInfo.numericalId);
                 }
-                MelonLogger.Msg("Subscribing to mod... NOT SUBSCRIBED YET!");
-                ModFileManager.Subscribe(viewedInfo.numericalId);
-                if (viewedInfo.directDownloadLink != null)
+                if (viewedInfo.windowsDownloadLink != "nothing" || viewedInfo.androidDownloadLink != "nothing")
                 {
                     MainClass.ReceiveSubModInfo(viewedInfo);
                 }
@@ -352,11 +366,13 @@ namespace ModIoModNetworker.Ui
 
                 if (viewedInfo.IsSubscribed())
                 {
+                    
                     ModFileManager.UnSubscribe(viewedInfo.numericalId);
                     if (viewedInfo.IsInstalled())
                     {
                         ModFileManager.UnInstall(viewedInfo.numericalId);
                     }
+                    MainClass.subscribedModIoNumericalIds.Remove(viewedInfo.numericalId);
                 }
             }
             UpdateModPopupButtons();
@@ -366,15 +382,15 @@ namespace ModIoModNetworker.Ui
         {
             if (selected)
             {
-                MainClass.subscribedModIoNumericalIds.Remove(viewedInfo.numericalId);
                 ModFileManager.UnInstall(viewedInfo.numericalId);
                 if (viewedInfo.IsSubscribed()) {
                     ModFileManager.UnSubscribe(viewedInfo.numericalId);
                 }
+                MainClass.subscribedModIoNumericalIds.Remove(viewedInfo.numericalId);
             }
             else
             {
-                if (viewedInfo.directDownloadLink != null)
+                if (viewedInfo.windowsDownloadLink != null)
                 {
                     ModFileManager.AddToQueue(new DownloadQueueElement()
                     {
@@ -398,10 +414,8 @@ namespace ModIoModNetworker.Ui
         }
 
         public void TriggerModInfoPopup(bool show, ModInfo modInfo) {
-            MelonLogger.Msg("Triggering mod info popup!");
             rootAnimator = GetComponentInParent<Animator>();
             rootAnimator.SetTrigger("triggerpopup");
-            MelonLogger.Msg("Triggered mod info popup!");
             if (show)
             {
                 SetMainCanvasColliderState(false);
@@ -544,6 +558,7 @@ namespace ModIoModNetworker.Ui
                 case InstalledSort.INSTALLED:
                     filesTab.transform.Find("GridLayout").gameObject.SetActive(true);
                     filesTab.transform.Find("ListLayout").gameObject.SetActive(false);
+                    filesTab.transform.Find("UninstallUnsubscribedModsButton").gameObject.SetActive(true);
                     maxPages = (int) Math.Ceiling((double) totalInstalled.Count / (double) maxDisplayPerPage);
                     UpdateArrowDisplays();
                     PopulateFiles(pageNumber);
@@ -551,6 +566,7 @@ namespace ModIoModNetworker.Ui
                 case InstalledSort.SUBSCRIBED:
                     filesTab.transform.Find("GridLayout").gameObject.SetActive(true);
                     filesTab.transform.Find("ListLayout").gameObject.SetActive(false);
+                    filesTab.transform.Find("UninstallUnsubscribedModsButton").gameObject.SetActive(false);
                     List<ModInfo> subscribedInfos = new List<ModInfo>();
                     foreach (ModInfo info in totalInstalled)
                     {
@@ -566,6 +582,7 @@ namespace ModIoModNetworker.Ui
                 case InstalledSort.BLACKLIST:
                     filesTab.transform.Find("GridLayout").gameObject.SetActive(false);
                     filesTab.transform.Find("ListLayout").gameObject.SetActive(true);
+                    filesTab.transform.Find("UninstallUnsubscribedModsButton").gameObject.SetActive(false);
                     maxPages = (int) Math.Ceiling((double) MainClass.blacklistedModIoIds.Count / (double) 4);
                     UpdateArrowDisplays();
                     PopulateBlacklist(pageNumber);
@@ -637,10 +654,13 @@ namespace ModIoModNetworker.Ui
             for (int i = 0; i < childCount; i++)
             {
                 Transform child = gridView.transform.GetChild(i);
-                ModInfoDisplay modInfoDisplay = child.GetComponent<ModInfoDisplay>();
+                ModInfoDisplay modInfoDisplay = child.GetComponentInChildren<ModInfoDisplay>();
 
-                // Manual texture removing nonsense
-                DestroyImmediate(modInfoDisplay.thumbnailImage.texture);
+                if (modInfoDisplay)
+                {
+                    // Manual texture removing nonsense
+                    DestroyImmediate(modInfoDisplay.thumbnailImage.texture);
+                }
                 Destroy(child.gameObject);
             }
 
@@ -668,10 +688,13 @@ namespace ModIoModNetworker.Ui
             int childCount = gridView.transform.childCount;
             for (int i = 0; i < childCount; i++) {
                 Transform child = gridView.transform.GetChild(i);
-                ModInfoDisplay modInfoDisplay = child.GetComponent<ModInfoDisplay>();
+                ModInfoDisplay modInfoDisplay = child.GetComponentInChildren<ModInfoDisplay>();
 
-                // Manual texture removing nonsense
-                DestroyImmediate(modInfoDisplay.thumbnailImage.texture);
+                if (modInfoDisplay)
+                {
+                    // Manual texture removing nonsense
+                    DestroyImmediate(modInfoDisplay.thumbnailImage.texture);
+                }
                 Destroy(child.gameObject);
             }
 
@@ -715,10 +738,12 @@ namespace ModIoModNetworker.Ui
             for (int i = 0; i < childCount; i++)
             {
                 Transform child = gridView.transform.GetChild(i);
-                ModInfoDisplay modInfoDisplay = child.GetComponent<ModInfoDisplay>();
+                ModInfoDisplay modInfoDisplay = child.GetComponentInChildren<ModInfoDisplay>();
+                if (modInfoDisplay) {
+                    // Manual texture removing nonsense
+                    DestroyImmediate(modInfoDisplay.thumbnailImage.texture);
+                }
 
-                // Manual texture removing nonsense
-                DestroyImmediate(modInfoDisplay.thumbnailImage.texture);
                 Destroy(child.gameObject);
             }
 
@@ -882,6 +907,10 @@ namespace ModIoModNetworker.Ui
                 
             }
 
+            if (selectedPanel == Panels.MULTIPLAYER) {
+                PopulateHostMods(pageNumber);
+            }
+
             if (selectedPanel == Panels.FILES) {
                 if (chosenSort != InstalledSort.BLACKLIST)
                 {
@@ -1022,7 +1051,7 @@ namespace ModIoModNetworker.Ui
                 TMP_Text title = modProgressDisplay.transform.Find("Title").gameObject.GetComponent<TMP_Text>();
                 title.text = ModFileManager.activeDownloadQueueElement.info.modName;
                 TMP_Text progress = modProgressDisplay.transform.Find("Percentage").gameObject.GetComponent<TMP_Text>();
-                progress.text = ModlistMenu.activeDownloadModInfo.modDownloadPercentage + "%";
+                progress.text = ((int)Math.Round(ModlistMenu.activeDownloadModInfo.modDownloadPercentage)) + "%";
             }
             else {
                 lastDownloadedTitle = "nothing";
@@ -1035,7 +1064,7 @@ namespace ModIoModNetworker.Ui
 
             if (keyboardPopup) {
                 typeBarText.text = KeyboardManager.typed;
-                if (KeyboardManager.typed.IsEmpty())
+                if (KeyboardManager.typed == "")
                 {
                     typeBarTextObject.SetActive(false);
                     typeBarEmptyTextObject.SetActive(true);

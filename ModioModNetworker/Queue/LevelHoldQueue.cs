@@ -34,8 +34,6 @@ namespace ModioModNetworker.Queue
         
         public static void SetQueue(LevelHoldQueueData data)
         {
-            MelonLogger.Msg("Got a level that isn't in the warehouse, adding to queue");
-            MelonLogger.Msg("Barcode: " + data.missingBarcode);
             FusionNotifier.Send(new FusionNotification()
             {
                 title = new NotificationText($"The host tried loading a level you dont have. \"{data.missingBarcode}\""),

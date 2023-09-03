@@ -3,11 +3,13 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Web.Script.Serialization;
 using BoneLib;
+using Il2CppSystem.IO;
 using LabFusion.Representation;
 using LabFusion.Utilities;
 using MelonLoader;
+using Newtonsoft.Json;
+using UnityEngine;
 
 namespace ModioModNetworker.Data
 {
@@ -16,6 +18,7 @@ namespace ModioModNetworker.Data
         public string modId;
         public string json;
         public string destination;
+        public Action<ModInfo> onInfo;
         public bool mature = false;
         public dynamic originalModInfo;
     }
@@ -31,7 +34,9 @@ namespace ModioModNetworker.Data
         public string modName;
         public string modSummary;
         public string fileName;
-        public string directDownloadLink;
+        public string windowsDownloadLink = "nothing";
+        public string androidDownloadLink = "nothing";
+        public string directDownloadLink = "nothing";
         public double modDownloadPercentage;
         public string numericalId;
         public string version = "0.0.0";
@@ -39,7 +44,7 @@ namespace ModioModNetworker.Data
         public bool temp = false;
 
         private static Action onFinished;
-        public static int globalStructureVersion = 3;
+        public static int globalStructureVersion = 4;
         public static float requestSize = 0;
         public static ConcurrentQueue<ModInfoThreadRequest> modInfoThreadRequests = new ConcurrentQueue<ModInfoThreadRequest>();
 
@@ -52,7 +57,15 @@ namespace ModioModNetworker.Data
                     ModFileManager.isDownloading = true;
                     ModlistMenu.activeDownloadModInfo = this;
                     ModFileManager.downloadingModId = modId;
-                    ModFileManager.DownloadFile(directDownloadLink, MelonUtils.GameDirectory + "\\temp.zip");
+                    if (!HelperMethods.IsAndroid())
+                    {
+                        ModFileManager.DownloadFile(windowsDownloadLink, MelonUtils.GameDirectory + "\\temp.zip");
+                    }
+                    else
+                    {
+                        ModFileManager.DownloadFile(androidDownloadLink, Path.Combine(Application.persistentDataPath, "temp.zip"));
+                    }
+
                     return true;
                 }
             }
@@ -77,7 +90,7 @@ namespace ModioModNetworker.Data
                 if (modInfoThreadRequests.TryDequeue(out request))
                 {
                     requestSize--;
-                    Make(request.modId, request.json, request.destination, request.originalModInfo);
+                    Make(request.modId, request.json, request.destination, request.originalModInfo, request.mature);
                     if (requestSize == 0)
                     {
                         onFinished?.Invoke();
@@ -122,34 +135,40 @@ namespace ModioModNetworker.Data
 
         public static void RequestModInfo(string modId, string destination)
         {
-            Thread thread = new Thread(() =>
+            ModFileManager.GetJson("@" + modId, (json) =>
             {
-                string json = ModFileManager.GetJson("@"+modId);
                 modInfoThreadRequests.Enqueue(new ModInfoThreadRequest()
                     { modId = modId, json = json, destination = destination });
             });
-            thread.Start();
         }
 
         public static void RequestModInfoNumerical(string modIdNumerical, string destination)
         {
-            Thread thread = new Thread(() =>
+
+            if (modIdNumerical == null)
             {
-                if (modIdNumerical == null) {
-                    MelonLogger.Msg("Mod ID Numerical was null, skipping");
+                MelonLogger.Msg("Mod ID Numerical was null, skipping");
+                return;
+            }
+
+            ModFileManager.GetRawModInfoJson(modIdNumerical, (totalModInfo) =>
+            {
+                if (totalModInfo == null)
+                {
                     return;
                 }
-                dynamic totalModInfo = ModFileManager.GetRawModInfoJson(modIdNumerical);
-                if (totalModInfo == null) {
-                    return;
-                }
-                string modId = totalModInfo["name_id"];
-                bool mature = totalModInfo["maturity_option"] > 0;
-                string json = ModFileManager.GetJson("@" + modId);
-                modInfoThreadRequests.Enqueue(new ModInfoThreadRequest()
-                { modId = modId, json = json, destination = destination, mature = mature, originalModInfo = totalModInfo});
+
+                string modId = (string) totalModInfo["name_id"];
+                bool mature = (int)totalModInfo["maturity_option"] > 0;
+                ModFileManager.GetJson("@" + modId, (json) =>
+                {
+                    modInfoThreadRequests.Enqueue(new ModInfoThreadRequest()
+                    {
+                        modId = modId, json = json, destination = destination, mature = mature,
+                        originalModInfo = totalModInfo
+                    });
+                });
             });
-            thread.Start();
         }
 
         public static ModInfo MakeFromDynamic(dynamic mod, string modId)
@@ -161,10 +180,12 @@ namespace ModioModNetworker.Data
             modInfo.isValidMod = true;
             modInfo.downloading = false;
             
-            modInfo.fileSizeKB = mod["filesize"];
-            modInfo.fileName = mod["filename"];
-            modInfo.directDownloadLink = mod["download"]["binary_url"];
-            modInfo.version = mod["version"];
+            modInfo.fileSizeKB = (float)mod["filesize"];
+            modInfo.fileName = (string)mod["filename"];
+            
+            // They get properly set later
+            modInfo.windowsDownloadLink = (string)mod["download"]["binary_url"];
+            modInfo.version = (string)mod["version"];
 
             return modInfo;
         }
@@ -190,31 +211,70 @@ namespace ModioModNetworker.Data
             else if (destination == "install_level") {
                 action = new Action<ModInfo>((info =>
                 {
+                    if (MainClass.modNumericalsDownloadedDuringLobbySession.Contains(info.numericalId)) {
+                        return;
+                    }
+
+                    if (info.IsSubscribed())
+                    {
+                        return;
+                    }
+
                     if (MainClass.tempLobbyMods)
                     {
                         info.temp = true;
                     }
-                    ModFileManager.AddToQueue(new DownloadQueueElement()
+
+                    float mb = modInfo.fileSizeKB / 1000000;
+                    float gb = mb / 1000;
+
+                    if (gb < MainClass.levelMaxGb)
                     {
-                        associatedPlayer = null,
-                        info = info,
-                        notify = false
-                    });
+
+                        if (ModFileManager.AddToQueue(new DownloadQueueElement()
+                        {
+                            associatedPlayer = null,
+                            info = info,
+                            notify = true
+                        }))
+                        {
+                            MainClass.modNumericalsDownloadedDuringLobbySession.Add(info.numericalId);
+                        }
+                    }
                 }));
             }
             else if (destination == "install_spawnable")
             {
                 action = new Action<ModInfo>((info =>
                 {
+                    if (info.IsSubscribed())
+                    {
+                        return;
+                    }
+
+                    if (MainClass.modNumericalsDownloadedDuringLobbySession.Contains(info.numericalId))
+                    {
+                        return;
+                    }
+
                     if (MainClass.tempLobbyMods) {
                         info.temp = true;
                     }
-                    ModFileManager.AddToQueue(new DownloadQueueElement()
-                    {
-                        associatedPlayer = null,
-                        info = info,
-                        notify = true
-                    });
+
+
+                    float mb = modInfo.fileSizeKB / 1000000;
+
+                    if (mb < MainClass.maxAutoDownloadMb) {
+                        if (ModFileManager.AddToQueue(new DownloadQueueElement()
+                        {
+                            associatedPlayer = null,
+                            info = info,
+                            notify = true
+                        }))
+                        {
+                            MainClass.modNumericalsDownloadedDuringLobbySession.Add(info.numericalId);
+                        }
+                    }
                 }));
             }
             else if (destination == "install_native")
@@ -231,31 +291,48 @@ namespace ModioModNetworker.Data
             }
             else if (destination.StartsWith("install_avatar"))
             {
-
                 string id = destination.Split(';')[1];
                 byte idByte = byte.Parse(id);
                 PlayerId playerId = PlayerIdManager.GetPlayerId(idByte);
                 if (playerId != null) {
                     action = new Action<ModInfo>((info =>
                     {
+
+                        if (info.IsSubscribed())
+                        {
+                            return;
+                        }
+
+                        if (MainClass.modNumericalsDownloadedDuringLobbySession.Contains(info.numericalId))
+                        {
+                            return;
+                        }
+
                         if (MainClass.tempLobbyMods)
                         {
                             info.temp = true;
                         }
-                        ModFileManager.AddToQueue(new DownloadQueueElement()
+
+                        float mb = modInfo.fileSizeKB / 1000000;
+                        if (mb < MainClass.maxAutoDownloadMb)
                         {
-                            associatedPlayer = playerId,
-                            info = info,
-                            notify = false
-                        });
+                            if (ModFileManager.AddToQueue(new DownloadQueueElement()
+                            {
+                                associatedPlayer = playerId,
+                                info = info,
+                                notify = false
+                            }))
+                            {
+                                MainClass.modNumericalsDownloadedDuringLobbySession.Add(info.numericalId);
+                            }
+                        }
                     }));
                 }
             }
 
             try
             {
-                JavaScriptSerializer parser = new JavaScriptSerializer();
-                var jsonData = parser.Deserialize<dynamic>(json);
+                var jsonData = JsonConvert.DeserializeObject<dynamic>(json);
                 // Get data array and loop through it
                 var data = jsonData["data"];
 
@@ -270,64 +347,134 @@ namespace ModioModNetworker.Data
                 modInfo.downloading = false;
 
                 dynamic foundMod = null;
+                dynamic antiPlatformMod = null;
 
                 string prevVersion = "0.0.0";
+                string prevAntiVersion = "0.0.0";
 
                 foreach (var mod in data)
                 {
                     dynamic platforms = mod["platforms"];
-                    bool validMod = false;
+                    bool validMainPlatform = false;
+                    bool validAntiPlatformMod = false;
                     foreach (var supported in platforms)
                     {
                         // This mod is currently tied to Fusion which is PC only atm, but its good to future proof
+                        //
+                        // 7/18/23 - HAHAHA :)
                         bool isAndroid = HelperMethods.IsAndroid();
                         string currentPlatform = isAndroid ? "android" : "windows";
                         string antiPlatform = isAndroid ? "windows" : "android";
                         
-                        if (supported["platform"] == currentPlatform)
+                        if ((string)supported["platform"] == currentPlatform)
                         {
-                            validMod = true;
+                            validMainPlatform = true;
                         }
-                        else if (supported["platform"] == antiPlatform)
+                        else if ((string)supported["platform"] == antiPlatform)
                         {
-                            validMod = false;
+                            validMainPlatform = false;
+                            break;
+                        }
+                    }
+                    
+                    foreach (var supported in platforms)
+                    {
+                        // This mod is currently tied to Fusion which is PC only atm, but its good to future proof
+                        //
+                        // 7/18/23 - HAHAHA :)
+                        bool isAndroid = HelperMethods.IsAndroid();
+                        string currentPlatform = isAndroid ? "android" : "windows";
+                        string antiPlatform = isAndroid ? "windows" : "android";
+                        
+                        if ((string)supported["platform"] == antiPlatform)
+                        {
+                            validAntiPlatformMod = true;
+                        }
+                        else if ((string)supported["platform"] == currentPlatform)
+                        {
+                            validAntiPlatformMod = false;
                             break;
                         }
                     }
 
-                    if (!validMod) continue;
-
-                    string modVersion = "" + mod["version"];
-                    // Compare versions x.x.x
-                    if (modVersion.CompareTo(prevVersion) > 0 || foundMod == null)
+                    if (!validMainPlatform && !validAntiPlatformMod)
                     {
-                        foundMod = mod;
-                        prevVersion = modVersion;
+                        continue;
+                    }
+
+                    if (validMainPlatform)
+                    {
+                        string modVersion = "" + (string)mod["version"];
+                        // Compare versions x.x.x
+                        if (modVersion.CompareTo(prevVersion) > 0 || foundMod == null)
+                        {
+                            foundMod = mod;
+                            prevVersion = modVersion;
+                        }
+                    }
+
+                    if (validAntiPlatformMod)
+                    {
+                        string modVersion = "" + (string)mod["version"];
+                        if (modVersion.CompareTo(prevAntiVersion) > 0 || antiPlatformMod == null)
+                        {
+                            antiPlatformMod = mod;
+                            prevAntiVersion = modVersion;
+                        }
                     }
                 }
 
                 if (foundMod != null)
                 {
-                    if (originalModInfo != null) {
+                    if (originalModInfo != null)
+                    {
                         // Apply the info we got from the get mod request. This has stuff like the numerical id and the thumbnail link.
-                        string modUrl = originalModInfo["profile_url"];
-                        string numericalId = "" + originalModInfo["id"];
-                        string modTitle = originalModInfo["name"];
-                        string summary = originalModInfo["summary"];
-                        string thumbnailLink = originalModInfo["logo"]["thumb_640x360"];
+                        string modUrl = (string)originalModInfo["profile_url"];
+                        string numericalId = "" + (string)originalModInfo["id"];
+                        string modTitle = (string)originalModInfo["name"];
+                        string summary = (string)originalModInfo["summary"];
+                        string thumbnailLink = (string)originalModInfo["logo"]["thumb_640x360"];
 
                         modInfo.modName = modTitle;
                         modInfo.thumbnailLink = thumbnailLink;
                         modInfo.modSummary = summary;
                         modInfo.numericalId = numericalId;
                     }
-                    
 
-                    modInfo.fileSizeKB = foundMod["filesize"];
-                    modInfo.directDownloadLink = foundMod["download"]["binary_url"];
-                    modInfo.fileName = foundMod["filename"];
-                    modInfo.version = ""+foundMod["version"];
-                    
+
+                    modInfo.fileSizeKB = (float)foundMod["filesize"];
+
+                    if (!HelperMethods.IsAndroid())
+                    {
+                        modInfo.windowsDownloadLink = (string)foundMod["download"]["binary_url"];
+                        if (antiPlatformMod != null)
+                        {
+                            modInfo.androidDownloadLink = (string)antiPlatformMod["download"]["binary_url"];
+                        }
+                    }
+                    else
+                    {
+                        modInfo.androidDownloadLink = (string)foundMod["download"]["binary_url"];
+                        if (antiPlatformMod != null)
+                        {
+                            modInfo.windowsDownloadLink = (string)antiPlatformMod["download"]["binary_url"];
+                        }
+                    }
+
+
+                    modInfo.fileName = (string)foundMod["filename"];
+
+                    modInfo.version = "" + (string)foundMod["version"];
+
+                    if (HelperMethods.IsAndroid())
+                    {
+                        if (antiPlatformMod != null)
+                        {
+                            // Just resorting to the windows version cause I don't really wanna deal with managing and comparing cross platform versions when people call their mods things like
+                            // AWESOMENESS UPDATE - QUEST and AWESOMENESS UPDATE - PC
+                            modInfo.version = "" + (string)antiPlatformMod["version"];
+                        }
+                    }
 
                     if (modInfo.version == null)
                     {

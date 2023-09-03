@@ -50,6 +50,9 @@
     <Reference Include="LabFusion">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\Mods\LabFusion.dll</HintPath>
     </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\Managed\Newtonsoft.Json.dll</HintPath>
+    </Reference>
     <Reference Include="SLZ.Algorithms">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\Managed\SLZ.Algorithms.dll</HintPath>
     </Reference>
@@ -88,9 +91,6 @@
     <Reference Include="System.Web.DynamicData">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\Managed\System.Web.DynamicData.dll</HintPath>
     </Reference>
-    <Reference Include="System.Web.Extensions">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\Managed\System.Web.Extensions.dll</HintPath>
-    </Reference>
     <Reference Include="System.Web.Extensions.Design">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\Managed\System.Web.Extensions.Design.dll</HintPath>
     </Reference>
@@ -117,15 +117,6 @@
     </Reference>
     <Reference Include="System.Web.Services">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\Managed\System.Web.Services.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Web.WebPages">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\Managed\System.Web.WebPages.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Web.WebPages.Deployment">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\Managed\System.Web.WebPages.Deployment.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Web.WebPages.Razor">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\Managed\System.Web.WebPages.Razor.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -502,10 +493,10 @@
     <Compile Include="Utilities\ResourceHelpers.cs" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\networker.assets" />
+    <EmbeddedResource Include="Resources\networkermenu.networker" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\networkermenu.networker" />
+    <EmbeddedResource Include="Resources\networkermenu.android.networker" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

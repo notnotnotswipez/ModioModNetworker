@@ -88,8 +88,8 @@ namespace ModioModNetworker.UI
             {
                 Show();
             }
-            
-            percentageText.text = $"{percentage}%";
+            string safeDisplay = percentage.ToString("0.0");
+            percentageText.text = $"{safeDisplay}%";
             float position = zeroPosition - (percentage / 100f) * (zeroPosition - completePosition);
             RectTransform rt = fill.GetComponent<RectTransform>();
             rt.localPosition = new Vector3(position, 0f, 0f);

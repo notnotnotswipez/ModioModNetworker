@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Web.WebPages;
 using LabFusion.Data;
 using LabFusion.Network;
 using LabFusion.Representation;
@@ -137,6 +136,10 @@ namespace ModioModNetworker
                                                     return;
                                                 }
 
+                                                if (MainClass.modNumericalsDownloadedDuringLobbySession.Contains(modInfo.numericalId)) {
+                                                    return;
+                                                }
+
                                                 if (modInfo.IsSubscribed())
                                                 {
                                                     return;
@@ -147,12 +150,15 @@ namespace ModioModNetworker
                                                     modInfo.temp = true;
                                                 }
 
-                                                ModFileManager.AddToQueue(new DownloadQueueElement()
+                                                if (ModFileManager.AddToQueue(new DownloadQueueElement()
                                                 {
                                                     associatedPlayer = data.playerId,
                                                     info = modInfo,
-                                                    notify = false
-                                                });
+                                                    notify = true
+                                                }))
+                                                {
+                                                    MainClass.modNumericalsDownloadedDuringLobbySession.Add(modInfo.numericalId);
+                                                }
                                             }
                                             break;
                                         }
@@ -172,16 +178,25 @@ namespace ModioModNetworker
                                                     return;
                                                 }
 
+                                                if (MainClass.modNumericalsDownloadedDuringLobbySession.Contains(modInfo.numericalId))
+                                                {
+                                                    return;
+                                                }
+
                                                 if (MainClass.tempLobbyMods)
                                                 {
                                                     modInfo.temp = true;
                                                 }
 
-                                                ModFileManager.AddToQueue(new DownloadQueueElement()
+                                                if (ModFileManager.AddToQueue(new DownloadQueueElement()
                                                 {
                                                     associatedPlayer = null,
                                                     info = modInfo,
-                                                });
+                                                    notify = true
+                                                }))
+                                                {
+                                                    MainClass.modNumericalsDownloadedDuringLobbySession.Add(modInfo.numericalId);
+                                                }
                                             }
 
                                             break;
@@ -204,21 +219,29 @@ namespace ModioModNetworker
                                                     return;
                                                 }
 
+                                                if (MainClass.modNumericalsDownloadedDuringLobbySession.Contains(modInfo.numericalId))
+                                                {
+                                                    return;
+                                                }
+
                                                 if (MainClass.tempLobbyMods)
                                                 {
                                                     modInfo.temp = true;
                                                 }
 
-                                                ModFileManager.AddToQueue(new DownloadQueueElement()
+                                                if (ModFileManager.AddToQueue(new DownloadQueueElement()
                                                 {
                                                     associatedPlayer = null,
                                                     info = modInfo,
-                                                });
+                                                    notify = true
+                                                }))
+                                                {
+                                                    MainClass.modNumericalsDownloadedDuringLobbySession.Add(modInfo.numericalId);
+                                                }
                                             }
 
                                             break;
                                         }
-
                                 }
                             }
                         }

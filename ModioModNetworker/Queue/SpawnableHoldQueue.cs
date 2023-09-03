@@ -42,9 +42,6 @@ namespace ModioModNetworker.Queue
         
         public static void AddToQueue(SpawnableHoldQueueData data)
         {
-            MelonLogger.Msg("Got a spawnable that isn't in the warehouse, adding to queue");
-            MelonLogger.Msg("Barcode: " + data.missingBarcode);
-            
             queueDatas.Add(data);
         }
 

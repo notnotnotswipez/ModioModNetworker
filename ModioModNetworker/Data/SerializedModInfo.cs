@@ -11,7 +11,8 @@ namespace ModioModNetworker.Data
         public bool mature = false;
         public ModInfo modInfo;
         private float fileSize;
-        private string downloadLink;
+        private string windowsDownloadLink;
+        private string androidDownloadLink;
         private string numericalId;
         private string versionNumber;
         private string modId;
@@ -24,7 +25,8 @@ namespace ModioModNetworker.Data
                 mature = info.mature,
                 modId = info.modId,
                 fileSize = info.fileSizeKB,
-                downloadLink = info.directDownloadLink,
+                windowsDownloadLink = info.windowsDownloadLink,
+                androidDownloadLink = info.androidDownloadLink,
                 numericalId = info.numericalId,
                 versionNumber = info.version
             };
@@ -39,8 +41,9 @@ namespace ModioModNetworker.Data
             string[] split = received.Split(GameObjectUtilities.PathSeparator);
             numericalId = split[0];
             versionNumber = split[1];
-            downloadLink = split[2];
-            modId = split[3];
+            windowsDownloadLink = split[2];
+            androidDownloadLink = split[3];
+            modId = split[4];
 
             RepoModInfo repoModInfo = RepoManager.GetRepoModInfoFromModId(numericalId);
             modInfo = new ModInfo
@@ -51,7 +54,8 @@ namespace ModioModNetworker.Data
                 modId = modId,
                 mature = mature,
                 version = versionNumber,
-                directDownloadLink = downloadLink,
+                windowsDownloadLink = windowsDownloadLink,
+                androidDownloadLink = androidDownloadLink,
                 fileSizeKB = fileSize,
                 fileName = modId+".zip"
             };
@@ -70,7 +74,8 @@ namespace ModioModNetworker.Data
             string built = "";
             built += numericalId + GameObjectUtilities.PathSeparator;
             built += versionNumber + GameObjectUtilities.PathSeparator;
-            built += downloadLink + GameObjectUtilities.PathSeparator;
+            built += windowsDownloadLink + GameObjectUtilities.PathSeparator;
+            built += androidDownloadLink + GameObjectUtilities.PathSeparator;
             built += modId;
             writer.Write(built);
         }
