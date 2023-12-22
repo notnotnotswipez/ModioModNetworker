@@ -30,6 +30,7 @@ namespace ModioModNetworker.Patches
                                 if (!IsCrate(data.levelBarcode))
                                 {
                                     if (MainClass.useRepo) {
+                                        // TODO: REPO DOWN
                                         string palletBarcode = RepoManager.GetPalletBarcodeFromCrateBarcode(data.levelBarcode);
                                         string existingNumericalId = RepoManager.GetRepoModInfoFromPalletBarcode(palletBarcode).modNumericalId;
                                         if (existingNumericalId != null) {
@@ -75,6 +76,7 @@ namespace ModioModNetworker.Patches
                 ModInfo installedModInfo = ModInfoUtilities.GetModInfoForLevelBarcode(barcode);
                 if (installedModInfo != null)
                 {
+                    LobbyCreatePatch.LobbyMetaDataHelperPatch.lobbyNumericalId = installedModInfo.numericalId;
                     using (var writer = FusionWriter.Create()) {
                         using (var data = ModlistData.Create(PlayerIdManager.LocalId, installedModInfo, ModlistData.ModType.LEVEL)) {
                             writer.Write(data);
@@ -85,6 +87,7 @@ namespace ModioModNetworker.Patches
                         }
                     }
                 }
+                LobbyCreatePatch.LobbyMetaDataHelperPatch.lobbyNumericalId = "null";
             }
         }
         

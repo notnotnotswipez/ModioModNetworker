@@ -1,12 +1,8 @@
-using System;
-using System.Linq;
-using BoneLib.BoneMenu.Elements;
 using HarmonyLib;
-using LabFusion;
-using LabFusion.BoneMenu;
 using LabFusion.Network;
-using LabFusion.Utilities;
-using MelonLoader;
+using ModioModNetworker.Data;
+using ModioModNetworker.Utilities;
+using SLZ.Marrow.SceneStreaming;
 
 namespace ModioModNetworker.Patches
 {
@@ -15,9 +11,12 @@ namespace ModioModNetworker.Patches
         [HarmonyPatch(typeof(LobbyMetadataHelper), "WriteInfo")]
         public class LobbyMetaDataHelperPatch
         {
+            public static string lobbyNumericalId = "null";
+
             public static void Postfix(INetworkLobby lobby)
             {
                 lobby.SetMetadata("modionetworker", "true");
+                lobby.SetMetadata("networkermap", lobbyNumericalId);
             }
         }
     }

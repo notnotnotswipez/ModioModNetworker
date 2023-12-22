@@ -1,4 +1,5 @@
 using LabFusion.Data;
+using LabFusion.Extensions;
 using LabFusion.Network;
 using LabFusion.Utilities;
 using ModioModNetworker.Repo;
@@ -38,7 +39,7 @@ namespace ModioModNetworker.Data
             mature = reader.ReadBoolean();
             fileSize = reader.ReadSingle();
             string received = reader.ReadString();
-            string[] split = received.Split(GameObjectUtilities.PathSeparator);
+            string[] split = received.Split(StringExtensions.UniqueSeparator);
             numericalId = split[0];
             versionNumber = split[1];
             windowsDownloadLink = split[2];
@@ -72,10 +73,10 @@ namespace ModioModNetworker.Data
             writer.Write(mature);
             writer.Write(fileSize);
             string built = "";
-            built += numericalId + GameObjectUtilities.PathSeparator;
-            built += versionNumber + GameObjectUtilities.PathSeparator;
-            built += windowsDownloadLink + GameObjectUtilities.PathSeparator;
-            built += androidDownloadLink + GameObjectUtilities.PathSeparator;
+            built += numericalId + StringExtensions.UniqueSeparator;
+            built += versionNumber + StringExtensions.UniqueSeparator;
+            built += windowsDownloadLink + StringExtensions.UniqueSeparator;
+            built += androidDownloadLink + StringExtensions.UniqueSeparator;
             built += modId;
             writer.Write(built);
         }

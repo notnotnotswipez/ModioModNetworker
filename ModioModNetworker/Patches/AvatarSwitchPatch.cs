@@ -13,11 +13,13 @@ namespace ModioModNetworker.Patches
 {
     public class AvatarSwitchPatch
     {
+        // TODO: REPO DOWN
         [HarmonyPatch(typeof(PlayerRep), "OnSwapAvatar")]
         public class OnRepSwapAvatarPatch {
             public static void Postfix(PlayerRep __instance, bool success) {
                 if (!success && MainClass.useRepo && MainClass.autoDownloadAvatars)
                 {
+                    
                     string name;
                     __instance.PlayerId.TryGetDisplayName(out name);
                     string avatarBarcode = __instance.avatarId;

@@ -36,7 +36,7 @@ namespace ModioModNetworker
 {
     public struct ModioModNetworkerUpdaterVersion
     {
-        public const string versionString = "2.1.0";
+        public const string versionString = "2.1.1";
     }
     
     public class MainClass : MelonMod
@@ -52,6 +52,8 @@ namespace ModioModNetworker
         public static List<ModInfo> subscribedMods = new List<ModInfo>();
         public static List<ModInfo> installedMods = new List<ModInfo>();
         public static List<InstalledModInfo> InstalledModInfos = new List<InstalledModInfo>();
+        
+        // TODO: REPO INFO
         public static List<RepoModInfo> untrackedInstalledModInfos = new List<RepoModInfo>();
 
         private static List<InstalledModInfo> outOfDateModInfos = new List<InstalledModInfo>();
@@ -133,7 +135,7 @@ namespace ModioModNetworker
             useRepo = useRepoConfig.Value;
             
             ModFileManager.MOD_FOLDER_PATH = modsDirectory.Value;
-
+            
             RepoManager.LoadBarcodePairsFromRepos();
 
             AssetBundle uiAssets;
@@ -202,6 +204,32 @@ namespace ModioModNetworker
             {
                 category.CreateFunctionElement("ModioModNetworker Active On Server", Color.cyan, () => { });
             }
+            
+            /*if (lobby.TryGetMetadata("LevelBarcode", out var barcode))
+            {
+                if (!FusionSceneManager.HasLevel(barcode)) {
+                    lobby.TryGetMetadata("networkermap", out var numerical);
+                    if (numerical != "null")
+                    {
+                        category.CreateFunctionElement("Download Level", Color.cyan, () => {
+                            FusionNotifier.Send(new FusionNotification()
+                            {
+                                title = new NotificationText("Installing lobby level...", Color.cyan, true),
+                                showTitleOnPopup = true,
+                                popupLength = 1f,
+                                message = "Please wait",
+                                isMenuItem = false,
+                                isPopup = true,
+                            });
+                            
+                            // Native install because it was of our own volition
+                            ModInfo.RequestModInfoNumerical(numerical, "install_native");
+                        });
+                    }
+                }
+            }*/
+                
+            // TODO: REPO DOWN
             if (lobby.TryGetMetadata("LevelBarcode", out var barcode))
             {
                 if (!FusionSceneManager.HasLevel(barcode)) {
@@ -215,6 +243,8 @@ namespace ModioModNetworker
                             isMenuItem = false,
                             isPopup = true,
                         });
+                        
+                    
                         RepoModInfo repoModInfo = RepoManager.GetRepoModInfoFromPalletBarcode(RepoManager.GetPalletBarcodeFromCrateBarcode(barcode));
                         if (repoModInfo != null)
                         {
@@ -327,6 +357,8 @@ namespace ModioModNetworker
 
                     // If there are outdated remaining ones, that means they come from an older version of networker where they were installed but
                     // Never subscribed to. We have to pull the new information from the repo instead.
+                    
+                    // TODO: REPO INFO
                     foreach (var outOfDateInfo in outOfDateModInfos)
                     {
                         RepoModInfo repoModInfo = RepoManager.GetRepoModInfoFromPalletBarcode(outOfDateInfo.palletBarcode);
@@ -479,6 +511,8 @@ namespace ModioModNetworker
             {
                 installedMods.Clear();
                 InstalledModInfos.Clear();
+                
+                // TODO: REPO INFO
                 untrackedInstalledModInfos.Clear();
                 NetworkerMenuController.totalInstalled.Clear();
                 ModlistMenu.installPage = 0;
@@ -519,27 +553,34 @@ namespace ModioModNetworker
 
         private static void UpdateModInfo(ModInfo subscribed, InstalledModInfo installed)
         {
-            ModInfo original = installed.ModInfo;
-            original.mature = subscribed.mature;
-            original.modSummary = subscribed.modSummary;
-            original.modName = subscribed.modName;
-            original.thumbnailLink = subscribed.thumbnailLink;
-            original.numericalId = subscribed.numericalId;
-            original.structureVersion = ModInfo.globalStructureVersion;
-            original.windowsDownloadLink = subscribed.windowsDownloadLink;
-            original.androidDownloadLink = subscribed.androidDownloadLink;
-
-            if (original.version == null)
+            try
             {
-                original.version = "0.0.0";
+                ModInfo original = installed.ModInfo;
+                original.mature = subscribed.mature;
+                original.modSummary = subscribed.modSummary;
+                original.modName = subscribed.modName;
+                original.thumbnailLink = subscribed.thumbnailLink;
+                original.numericalId = subscribed.numericalId;
+                original.structureVersion = ModInfo.globalStructureVersion;
+                original.windowsDownloadLink = subscribed.windowsDownloadLink;
+                original.androidDownloadLink = subscribed.androidDownloadLink;
+
+                if (original.version == null)
+                {
+                    original.version = "0.0.0";
+                }
+                string modInfoPath = installed.modinfoJsonPath;
+                // Delete the old modinfo.json
+                File.Delete(modInfoPath);
+                // Write the new modinfo.json
+                string modInfoJson = (string) JsonConvert.SerializeObject(original);
+                File.WriteAllText(modInfoPath, modInfoJson);
+                MelonLogger.Msg($"Updated modinfo.json for {original.modId} to version {original.structureVersion}");
             }
-            string modInfoPath = installed.modinfoJsonPath;
-            // Delete the old modinfo.json
-            File.Delete(modInfoPath);
-            // Write the new modinfo.json
-            string modInfoJson = (string) JsonConvert.SerializeObject(original);
-            File.WriteAllText(modInfoPath, modInfoJson);
-            MelonLogger.Msg($"Updated modinfo.json for {original.modId} to version {original.structureVersion}");
+            catch (Exception e)
+            {
+                MelonLogger.Error("Skipped updating modinfo.json for "+installed.ModInfo.modId+" because of an error: "+e);
+            }
         }
 
         public static void ReceiveSubModInfo(ModInfo modInfo)
@@ -880,6 +921,7 @@ namespace ModioModNetworker
                     }
 
                     if (!foundModInfo) {
+                        // TODO: REPO INFO
                         // This means this is NOT a networker tracked mod, but with the repo we can mangle it to be one.
                         foreach (var alreadyInstalled in InstalledModInfos)
                         {
@@ -895,6 +937,7 @@ namespace ModioModNetworker
                             ModInfo falseReconstruction = new ModInfo()
                             {
                                 modName = repoModInfo.modName,
+                                isTracked = false,
                                 thumbnailLink = repoModInfo.thumbnailLink,
                                 modSummary = repoModInfo.summary,
                                 numericalId = repoModInfo.modNumericalId
@@ -1029,10 +1072,10 @@ namespace ModioModNetworker
             {    
                 sw.WriteLine("#                       ----- WELCOME TO THE MOD.IO AUTH TXT! -----");
                 sw.WriteLine("#");
-                sw.WriteLine("# Put your mod.io OAuth key in this file, and it will be used to download mods from the mod.io network.");
-                sw.WriteLine("# Your OAuth key can be found here: https://mod.io/me/access");
+                sw.WriteLine("# Put your mod.io OAuth token in this file, and it will be used to download mods from the mod.io network.");
+                sw.WriteLine("# Your OAuth token can be found here: https://mod.io/me/access");
                 sw.WriteLine("# At the bottom, you should see a section called 'OAuth Access'");
-                sw.WriteLine("# Create a key, call it whatever you'd like, this doesnt matter.");
+                sw.WriteLine("# Create a key, then create a token using the + Icon. call it whatever you'd like, this doesnt matter.");
                 sw.WriteLine("# Then create a token, call it whatever you'd like, this doesnt matter.");
                 sw.WriteLine("# The token is pretty long, so make sure you copy the entire thing. Make sure you're copying the token, not the key.");
                 sw.WriteLine("# Once you've copied the token, paste it in this file, replacing the text labeled REPLACE_THIS_TEXT_WITH_YOUR_TOKEN.");

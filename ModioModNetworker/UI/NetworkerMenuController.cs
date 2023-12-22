@@ -112,7 +112,7 @@ namespace ModIoModNetworker.Ui
             uninstallUnsubscribedConfirm.onClick.AddListener(new Action(() => {
                 foreach (var modInfo in totalInstalled)
                 {
-                    if (!modInfo.IsSubscribed()) {
+                    if (!modInfo.IsSubscribed() && modInfo.IsTracked()) {
                         ModFileManager.UnInstallMainThread(modInfo.numericalId);
                     }
                 }
@@ -296,17 +296,22 @@ namespace ModIoModNetworker.Ui
                 MainClass.subscribedModIoNumericalIds.Remove(viewedInfo.numericalId);
             }
             else {
-                if (!MainClass.subscribedModIoNumericalIds.Contains(viewedInfo.numericalId)) {
-                    MainClass.subscribedModIoNumericalIds.Add(viewedInfo.numericalId);
-                }
                 if (viewedInfo.windowsDownloadLink != "nothing" || viewedInfo.androidDownloadLink != "nothing")
                 {
+                    MelonLogger.Msg("Receive sub mod info called");
                     MainClass.ReceiveSubModInfo(viewedInfo);
                 }
                 else
                 {
                     MainClass.PopulateSubscriptions();
                 }
+                
+                if (!MainClass.subscribedModIoNumericalIds.Contains(viewedInfo.numericalId)) {
+                    MainClass.subscribedModIoNumericalIds.Add(viewedInfo.numericalId);
+                }
+
+                ModFileManager.Subscribe(viewedInfo.numericalId);
+                
             }
         }
 
@@ -609,6 +614,7 @@ namespace ModIoModNetworker.Ui
                     string modDisplay = original;
                     bool isNumeric = int.TryParse(modDisplay, out int n);
                     if (isNumeric) {
+                        // TODO: REPO DOWN
                         modDisplay = RepoManager.GetRepoModInfoFromModId(modDisplay).modName;
                     }
                     GameObject blacklistDisplay = Instantiate(NetworkerAssets.blacklistDisplayPrefab);

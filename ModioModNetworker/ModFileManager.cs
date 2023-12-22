@@ -246,7 +246,7 @@ namespace ModioModNetworker
             activeDownloadWebRequest = request;
 
             request.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
-            var sponse =request.SendWebRequest();
+            var sponse = request.SendWebRequest();
             sponse.m_completeCallback += new Action<AsyncOperation>((op) =>
             {
                 OnDownloadFileCompleted();
@@ -558,6 +558,8 @@ namespace ModioModNetworker
         public static void UnInstallMainThread(string numericalId)
         {
             InstalledModInfo installedModInfo = null;
+            
+            // TODO: REPO DOWN
             RepoModInfo repoModInfo = null;
 
             foreach (var modInfo in MainClass.InstalledModInfos)
@@ -568,13 +570,13 @@ namespace ModioModNetworker
                 }
             }
 
-            /*foreach (var repoInfo in MainClass.untrackedInstalledModInfos)
+            foreach (var repoInfo in MainClass.untrackedInstalledModInfos)
             {
                 if (repoInfo.modNumericalId == numericalId)
                 {
                     repoModInfo = repoInfo;
                 }
-            }*/
+            }
 
             try
             {
@@ -586,10 +588,19 @@ namespace ModioModNetworker
                     // Delete mod folder
                     string modJsonPath = installedModInfo.modinfoJsonPath;
                     // Get the directory containing the modinfo.json
-                    string folder = modJsonPath.Replace("\\modinfo.json", "");
-                    Directory.Delete(folder, true);
+                    if (!HelperMethods.IsAndroid())
+                    {
+                        string folder = modJsonPath.Replace("\\modinfo.json", "");
+                        Directory.Delete(folder, true);
+                    }
+                    else
+                    {
+                        string folder = modJsonPath.Replace("/storage/emulated/0/Android/data/com.StressLevelZero.BONELAB/files/", "").Replace("/modinfo.json", "");
+                        Directory.Delete(folder, true);
+                    }
                 }
 
+                // TODO: REPO DOWN
                 if (repoModInfo != null)
                 {
                     string barcode = repoModInfo.palletBarcode;
@@ -613,15 +624,36 @@ namespace ModioModNetworker
 
         private static void UnloadPallet(string palletBarcode)
         {
-            if (AssetWarehouse.Instance.TryGetPallet(palletBarcode, out var pallet))
+            try
             {
-                foreach (Crate crate in pallet._crates)
+                // Android thing
+                foreach (var pallet in AssetWarehouse.Instance.GetPallets())
                 {
-                    foreach (var assetPoolee in AssetSpawner._instance._barcodeToPool[crate._barcode].spawned)
+                    if (pallet._barcode != palletBarcode)
                     {
-                        GameObject.Destroy(assetPoolee.gameObject);
+                        continue;
+                    }
+
+                    foreach (Crate crate in pallet._crates)
+                    {
+                        foreach (var assetPool in AssetSpawner._instance._poolList)
+                        {
+                            if (assetPool._crate._barcode != crate._barcode)
+                            {
+                                continue;
+                            }
+
+                            foreach (var assetPoolee in assetPool.spawned)
+                            {
+                                GameObject.Destroy(assetPoolee.gameObject);
+                            }
+                        }
                     }
                 }
+            }
+            catch (Exception e)
+            {
+                MelonLogger.Error("Exception when deleting pallet objects");
             }
 
             AssetWarehouse.Instance.UnloadPallet(palletBarcode);
@@ -630,6 +662,8 @@ namespace ModioModNetworker
         public static void UnInstall(string numericalId)
         {
             InstalledModInfo installedModInfo = null;
+            
+            // TODO: REPO DOWN
             RepoModInfo repoModInfo = null;
 
             foreach (var modInfo in MainClass.InstalledModInfos)
@@ -640,6 +674,7 @@ namespace ModioModNetworker
                 }
             }
 
+            // TODO: REPO DOWN
             foreach (var repoInfo in MainClass.untrackedInstalledModInfos)
             {
                 if (repoInfo.modNumericalId == numericalId)
@@ -662,10 +697,20 @@ namespace ModioModNetworker
                         // Delete mod folder
                         string modJsonPath = installedModInfo.modinfoJsonPath;
                         // Get the directory containing the modinfo.json
-                        string folder = modJsonPath.Replace("\\modinfo.json", "");
-                        Directory.Delete(folder, true);
+                        if (!HelperMethods.IsAndroid())
+                        {
+                            string folder = modJsonPath.Replace("\\modinfo.json", "");
+                            Directory.Delete(folder, true);
+                        }
+                        else
+                        {
+                            string folder = modJsonPath.Replace("/storage/emulated/0/Android/data/com.StressLevelZero.BONELAB/files/", "").Replace("/modinfo.json", "");
+                            Directory.Delete(folder, true);
+                        }
+
                     }
 
+                    // TODO: REPO DOWN
                     if (repoModInfo != null)
                     {
                         string barcode = repoModInfo.palletBarcode;
@@ -677,8 +722,17 @@ namespace ModioModNetworker
                         // Delete mod folder
                         string palletJsonPath = repoModInfo.palletJsonPath;
                         // Get the directory containing the modinfo.json
-                        string folder = palletJsonPath.Replace("\\pallet.json", "");
-                        Directory.Delete(folder, true);
+
+                        if (!HelperMethods.IsAndroid())
+                        {
+                            string folder = palletJsonPath.Replace("\\pallet.json", "");
+                            Directory.Delete(folder, true);
+                        }
+                        else
+                        {
+                            string folder = palletJsonPath.Replace("/storage/emulated/0/Android/data/com.StressLevelZero.BONELAB/files/", "").Replace("/pallet.json", "");
+                            Directory.Delete(folder, true);
+                        }
                     }
                 }
                 catch (Exception ex)

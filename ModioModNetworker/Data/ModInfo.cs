@@ -28,6 +28,7 @@ namespace ModioModNetworker.Data
         public bool isValidMod;
         public bool downloading;
         public bool mature;
+        public bool isTracked = true;
         public string modId;
         public float fileSizeKB;
         public string thumbnailLink;
@@ -73,6 +74,11 @@ namespace ModioModNetworker.Data
             return false;
         }
 
+        public bool IsTracked()
+        {
+            return isTracked;
+        }
+
         public bool IsBlacklisted() {
             if (MainClass.blacklistedModIoIds.Contains(modId) || MainClass.blacklistedModIoIds.Contains(numericalId))
             {
@@ -116,14 +122,14 @@ namespace ModioModNetworker.Data
                     break;
                 }
             }
-            foreach (var mod in MainClass.untrackedInstalledModInfos)
+            /*foreach (var mod in MainClass.untrackedInstalledModInfos)
             {
                 if (mod.modNumericalId == numericalId)
                 {
                     isInstalled = true;
                     break;
                 }
-            }
+            }*/
 
             return isInstalled;
         }
@@ -434,7 +440,7 @@ namespace ModioModNetworker.Data
                         string modTitle = (string)originalModInfo["name"];
                         string summary = (string)originalModInfo["summary"];
                         string thumbnailLink = (string)originalModInfo["logo"]["thumb_640x360"];
-
+                     
                         modInfo.modName = modTitle;
                         modInfo.thumbnailLink = thumbnailLink;
                         modInfo.modSummary = summary;

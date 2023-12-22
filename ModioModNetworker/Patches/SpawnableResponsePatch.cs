@@ -30,6 +30,7 @@ namespace ModioModNetworker.Patches
                             {
                                 if (MainClass.useRepo)
                                 {
+                                    // TODO: REPO DOWN
                                     string palletBarcode = RepoManager.GetPalletBarcodeFromCrateBarcode(data.barcode);
                                     string existingNumericalId = RepoManager.GetRepoModInfoFromPalletBarcode(palletBarcode).modNumericalId;
                                     if (existingNumericalId != null)

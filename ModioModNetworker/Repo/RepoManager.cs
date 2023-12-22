@@ -15,8 +15,6 @@ namespace ModioModNetworker.Repo
         public static Dictionary<string, RepoModInfo> barcodeModIdPair = new Dictionary<string, RepoModInfo>();
         public static Dictionary<string, string> modIdToBarcode = new Dictionary<string, string>();
 
-        
-        
         public static void LoadBarcodePairsFromRepos()
         {
             foreach (string repo in repos)
@@ -37,10 +35,10 @@ namespace ModioModNetworker.Repo
 
                 string repoInformation = httpWebRequest.downloadHandler.text;
 
-                /*HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create(repo);
-                HttpWebResponse httpWebresponse = (HttpWebResponse)httpWebRequest.GetResponse();
-                StreamReader streamReader = new StreamReader(httpWebresponse.GetResponseStream());
-                string repoInformation = streamReader.ReadToEnd();*/
+                //HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create(repo);
+                //HttpWebResponse httpWebresponse = (HttpWebResponse)httpWebRequest.GetResponse();
+                //StreamReader streamReader = new StreamReader(httpWebresponse.GetResponseStream());
+                //string repoInformation = streamReader.ReadToEnd();
 
                 dynamic repoDynamic = JsonConvert.DeserializeObject<dynamic>(repoInformation, new JsonSerializerSettings
                 {
