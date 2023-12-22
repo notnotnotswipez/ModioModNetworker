@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -25,9 +26,9 @@ using ModioModNetworker.UI;
 using ModioModNetworker.Utilities;
 using ModIoModNetworker.Ui;
 using Newtonsoft.Json;
-using SLZ.Marrow.SceneStreaming;
-using SLZ.Marrow.Warehouse;
-using SLZ.Rig;
+using Il2CppSLZ.Marrow.SceneStreaming;
+using Il2CppSLZ.Marrow.Warehouse;
+using Il2CppSLZ.Rig;
 using UnityEngine;
 using File = System.IO.File;
 using ZipFile = System.IO.Compression.ZipFile;
@@ -106,6 +107,14 @@ namespace ModioModNetworker
 
         public static bool handlingInstalled = false;
         public static bool handlingSubscribed = false;
+        
+        
+        // TRACKING VARIABLES
+        
+        public static bool sceneStreamerLoaded = false;
+        public static bool assetWarehouseLoaded = false;
+        
+        public static StreamStatus lastStreamStatus = StreamStatus.DONE;
 
         public override void OnInitializeMelon()
         {
@@ -186,6 +195,7 @@ namespace ModioModNetworker
             MultiplayerHooking.OnStartServer += OnStartServer;
             MultiplayerHooking.OnPlayerRepCreated += OnPlayerRepCreated;
             MultiplayerHooking.OnLobbyCategoryCreated += OnLobbyCategoryMade;
+            
             MelonLogger.Msg("Populating currently installed mods via this mod.");
             installedMods.Clear();
             InstalledModInfos.Clear();
@@ -269,6 +279,7 @@ namespace ModioModNetworker
 
         public override void OnUpdate()
         {
+            //Stopwatch stopwatch = Stopwatch.StartNew();
             foreach (var bar in AvatarDownloadBar.bars.Values)
             {
                 bar.Update();
@@ -278,7 +289,12 @@ namespace ModioModNetworker
             MainThreadManager.HandleQueue();
             
             LevelHoldQueue.Update();
-
+            
+            //stopwatch.Stop();
+            //MelonLogger.Msg("Queue updates took "+stopwatch.Elapsed.TotalMilliseconds+"ms");
+            
+            
+            //stopwatch = Stopwatch.StartNew();
             if (ModFileManager.activeDownloadQueueElement != null)
             {
                 if (ModFileManager.activeDownloadQueueElement.associatedPlayer != null)
@@ -291,15 +307,46 @@ namespace ModioModNetworker
                     }
                 }
             }
+            
+            //stopwatch.Stop();
+            //MelonLogger.Msg("Active download queue check took "+stopwatch.Elapsed.TotalMilliseconds+"ms");
+            
+            
+            //stopwatch = Stopwatch.StartNew();
 
             bool loadingThisFrame = false;
-            if (SceneStreamer._session != null)
+
+            if (!sceneStreamerLoaded)
             {
-                if (SceneStreamer._session.Status == StreamStatus.LOADING)
+                if (SceneStreamer._session != null)
+                {
+                    sceneStreamerLoaded = true;
+                }
+            }
+
+            if (!assetWarehouseLoaded)
+            {
+                if (AssetWarehouse.Instance != null)
+                {
+                    assetWarehouseLoaded = true;
+                }
+            }
+
+            if (sceneStreamerLoaded)
+            {
+                lastStreamStatus = SceneStreamer._session.Status;
+                
+                if (lastStreamStatus == StreamStatus.LOADING)
                 {
                     loadingThisFrame = true;
                 }
             }
+            
+            //stopwatch.Stop();
+            //MelonLogger.Msg("Setting scene streamer session status took "+stopwatch.Elapsed.TotalMilliseconds+"ms");
+            
+            //stopwatch = Stopwatch.StartNew();
+            
             if (ModFileManager.activeDownloadAction != null)
             {
                 if (ModFileManager.activeDownloadAction.Check())
@@ -308,10 +355,15 @@ namespace ModioModNetworker
                     ModFileManager.activeDownloadAction = null;
                 }
             }
-
+            
+            //stopwatch.Stop();
+            //MelonLogger.Msg("Active download action check took "+stopwatch.Elapsed.TotalMilliseconds+"ms");
+            
+            
+            //stopwatch = Stopwatch.StartNew();
             if (!addedCallback)
             { 
-                if (AssetWarehouse.Instance != null)
+                if (assetWarehouseLoaded)
                 {
                     AssetWarehouse.Instance.OnCrateAdded += new Action<string>(s =>
                     {
@@ -330,6 +382,12 @@ namespace ModioModNetworker
                     DeleteAllTempMods();
                 }
             }
+            
+            //stopwatch.Stop();
+            //MelonLogger.Msg("Crate added callback check took "+stopwatch.Elapsed.TotalMilliseconds+"ms");
+            
+            
+            //stopwatch = Stopwatch.StartNew();
 
             if (subsRefreshing)
             {
@@ -380,13 +438,25 @@ namespace ModioModNetworker
                     outOfDateModInfos.Clear();
                 }
             }
+            
+            //stopwatch.Stop();
+            //MelonLogger.Msg("Subs refreshing check took "+stopwatch.Elapsed.TotalMilliseconds+"ms");
+            
+            
+            //stopwatch = Stopwatch.StartNew();
 
             if (ModFileManager.activeDownloadWebRequest != null)
             {
                 ModFileManager.OnDownloadProgressChanged(ModFileManager.activeDownloadWebRequest.downloadProgress * 100);
             }
+            
+            //stopwatch.Stop();
+            //MelonLogger.Msg("Active download web request check took "+stopwatch.Elapsed.TotalMilliseconds+"ms");
+            
+            
+            //stopwatch = Stopwatch.StartNew();
 
-            if (warehouseReloadRequested && AssetWarehouse.Instance != null && AssetWarehouse.Instance._initialLoaded && !palletLock)
+            if (warehouseReloadRequested && assetWarehouseLoaded && AssetWarehouse.Instance._initialLoaded && !palletLock)
             {
                 bool update = false;
                 if (warehousePalletReloadTargets.Count > 0)
@@ -446,8 +516,21 @@ namespace ModioModNetworker
                 }
             }
             
+            //stopwatch.Stop();
+            //MelonLogger.Msg("Warehouse reload check took "+stopwatch.Elapsed.TotalMilliseconds+"ms");
+            
+            
+            //stopwatch = Stopwatch.StartNew();
+            
+            
             ModInfo.HandleQueue();
             ModFileManager.CheckQueue();
+            
+            //stopwatch.Stop();
+            //MelonLogger.Msg("ModInfo queue check took "+stopwatch.Elapsed.TotalMilliseconds+"ms");
+            
+            
+            //stopwatch = Stopwatch.StartNew();
 
             if (!loadingThisFrame)
             {
@@ -474,6 +557,12 @@ namespace ModioModNetworker
                     ModlistMessage.waitAndQueue.Clear();
                 }
             }
+            
+            //stopwatch.Stop();
+            //MelonLogger.Msg("Modlist message queue check took "+stopwatch.Elapsed.TotalMilliseconds+"ms");
+            
+            
+            //stopwatch = Stopwatch.StartNew();
 
             if (subsChanged)
             {
@@ -483,6 +572,11 @@ namespace ModioModNetworker
                     SendAllMods();
                 }
             }
+            
+            //stopwatch.Stop();
+            //MelonLogger.Msg("Subs changed check took "+stopwatch.Elapsed.TotalMilliseconds+"ms");
+            
+            //stopwatch = Stopwatch.StartNew();
 
             if (menuRefreshRequested)
             {
@@ -494,6 +588,11 @@ namespace ModioModNetworker
                 ModlistMenu.Refresh(true);
                 menuRefreshRequested = false;
             }
+            
+            //stopwatch.Stop();
+            //MelonLogger.Msg("Menu refresh check took "+stopwatch.Elapsed.TotalMilliseconds+"ms");
+            
+            //stopwatch = Stopwatch.StartNew();
 
             if (refreshSubscribedModsRequested && !handlingInstalled && !handlingSubscribed) {
                 refreshSubscribedModsRequested = false;
@@ -506,6 +605,11 @@ namespace ModioModNetworker
                 desiredSubs = 0;
                 ModFileManager.QueueSubscriptions(subsShown);
             }
+            
+            //stopwatch.Stop();
+            //MelonLogger.Msg("Refresh subscribed mods check took "+stopwatch.Elapsed.TotalMilliseconds+"ms");
+            
+            //stopwatch = Stopwatch.StartNew();
 
             if (refreshInstalledModsRequested && !handlingSubscribed && !handlingInstalled)
             {
@@ -537,11 +641,21 @@ namespace ModioModNetworker
                     NetworkerMenuController.instance.UpdateModPopupButtons();
                 }
             }
+            
+            //stopwatch.Stop();
+            //MelonLogger.Msg("Refresh installed mods check took "+stopwatch.Elapsed.TotalMilliseconds+"ms");
+            
+            //stopwatch = Stopwatch.StartNew();
 
             if (subscriptionThreadString != "")
             {
                 InternalPopulateSubscriptions();
             }
+            
+            //stopwatch.Stop();
+            //MelonLogger.Msg("Internal populate subscriptions check took "+stopwatch.Elapsed.TotalMilliseconds+"ms");
+            
+            //stopwatch = Stopwatch.StartNew();
             if (trendingThreadString != "")
             {
                 InternalPopulateTrending();
@@ -549,6 +663,9 @@ namespace ModioModNetworker
                     NetworkerMenuController.instance.OnNewTrendingRecieved();
                 }
             }
+            
+            //stopwatch.Stop();
+            //MelonLogger.Msg("Internal populate trending check took "+stopwatch.Elapsed.TotalMilliseconds+"ms");
         }
 
         private static void UpdateModInfo(ModInfo subscribed, InstalledModInfo installed)

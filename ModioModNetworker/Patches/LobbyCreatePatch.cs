@@ -2,7 +2,7 @@ using HarmonyLib;
 using LabFusion.Network;
 using ModioModNetworker.Data;
 using ModioModNetworker.Utilities;
-using SLZ.Marrow.SceneStreaming;
+using Il2CppSLZ.Marrow.SceneStreaming;
 
 namespace ModioModNetworker.Patches
 {

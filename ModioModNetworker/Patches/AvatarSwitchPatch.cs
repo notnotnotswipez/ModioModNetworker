@@ -6,8 +6,8 @@ using LabFusion.Senders;
 using MelonLoader;
 using ModioModNetworker.Data;
 using ModioModNetworker.Repo;
-using SLZ.Marrow.SceneStreaming;
-using SLZ.Marrow.Warehouse;
+using Il2CppSLZ.Marrow.SceneStreaming;
+using Il2CppSLZ.Marrow.Warehouse;
 
 namespace ModioModNetworker.Patches
 {

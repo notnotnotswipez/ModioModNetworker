@@ -19,9 +19,9 @@ using ModioModNetworker.Repo;
 using ModioModNetworker.UI;
 using ModIoModNetworker.Ui;
 using Newtonsoft.Json;
-using SLZ.Marrow.Pool;
-using SLZ.Marrow.SceneStreaming;
-using SLZ.Marrow.Warehouse;
+using Il2CppSLZ.Marrow.Pool;
+using Il2CppSLZ.Marrow.SceneStreaming;
+using Il2CppSLZ.Marrow.Warehouse;
 using Steamworks.Data;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -129,17 +129,17 @@ namespace ModioModNetworker
         {
             if (!isDownloading)
             {
-                if (AssetWarehouse.Instance == null)
+                if (!MainClass.assetWarehouseLoaded)
                 {
                     return;
                 }
 
-                if (SceneStreamer._session == null)
+                if (!MainClass.sceneStreamerLoaded)
                 {
                     return;
                 }
 
-                if (SceneStreamer._session.Status == StreamStatus.LOADING)
+                if (MainClass.lastStreamStatus == StreamStatus.LOADING)
                 {
                     return;
                 }

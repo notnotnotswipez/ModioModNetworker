@@ -2,8 +2,8 @@ using System.Collections.Generic;
 using LabFusion.Extensions;
 using LabFusion.Representation;
 using ModioModNetworker.Utilities;
-using SLZ.Rig;
-using TMPro;
+using Il2CppSLZ.Rig;
+using Il2CppTMPro;
 using UnityEngine;
 
 namespace ModioModNetworker.UI

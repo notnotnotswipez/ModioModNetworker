@@ -4,9 +4,10 @@ using BoneLib.Nullables;
 using LabFusion.Network;
 using LabFusion.Utilities;
 using MelonLoader;
-using SLZ.Marrow.Data;
-using SLZ.Marrow.Pool;
-using SLZ.Marrow.Warehouse;
+using Il2CppSLZ.Marrow.Data;
+using Il2CppSLZ.Marrow.Pool;
+using Il2CppSLZ.Marrow.Warehouse;
+using LabFusion.Extensions;
 using UnityEngine;
 
 namespace ModioModNetworker.Queue
@@ -77,7 +78,7 @@ namespace ModioModNetworker.Queue
             string path = data.spawnerPath;
             var hand = data.hand;
 
-            NullableMethodExtensions.PoolManager_Spawn(spawnable, data.serializedTransform.position, data.serializedTransform.rotation.Expand(), null,
+            NullableMethodExtensions.PoolManager_Spawn(spawnable, data.serializedTransform.position.ToUnityVector3(), data.serializedTransform.rotation.ToUnityQuaternion(), null,
                 true, null, (Action<GameObject>)((go) => { SpawnResponseMessage.OnSpawnFinished(owner, barcode, syncId, go, path, hand); }), null);
         }
     }

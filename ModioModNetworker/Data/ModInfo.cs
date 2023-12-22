@@ -10,6 +10,7 @@ using LabFusion.Utilities;
 using MelonLoader;
 using Newtonsoft.Json;
 using UnityEngine;
+using Path = System.IO.Path;
 
 namespace ModioModNetworker.Data
 {

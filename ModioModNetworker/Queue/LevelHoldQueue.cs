@@ -3,10 +3,10 @@ using BoneLib.Nullables;
 using LabFusion.Network;
 using LabFusion.Utilities;
 using MelonLoader;
-using SLZ.Marrow.Data;
-using SLZ.Marrow.Pool;
-using SLZ.Marrow.SceneStreaming;
-using SLZ.Marrow.Warehouse;
+using Il2CppSLZ.Marrow.Data;
+using Il2CppSLZ.Marrow.Pool;
+using Il2CppSLZ.Marrow.SceneStreaming;
+using Il2CppSLZ.Marrow.Warehouse;
 using UnityEngine;
 
 namespace ModioModNetworker.Queue
@@ -63,9 +63,9 @@ namespace ModioModNetworker.Queue
         {
             if (waitingForLevel)
             {
-                if (SceneStreamer._session != null)
+                if (MainClass.sceneStreamerLoaded)
                 {
-                    if (SceneStreamer._session.Status == StreamStatus.LOADING)
+                    if (MainClass.lastStreamStatus == StreamStatus.LOADING)
                     {
                         waitingForLevelToLoad = true;
                         waitingForLevel = false;
@@ -75,9 +75,9 @@ namespace ModioModNetworker.Queue
 
             if (waitingForLevelToLoad)
             {
-                if (SceneStreamer._session != null)
+                if (MainClass.sceneStreamerLoaded)
                 {
-                    if (SceneStreamer._session.Status != StreamStatus.LOADING)
+                    if (MainClass.lastStreamStatus != StreamStatus.LOADING)
                     {
                         waitingForLevelToLoad = false;
                         finishedLoadingLevel = true;
@@ -87,16 +87,14 @@ namespace ModioModNetworker.Queue
 
             if (finishedLoadingLevel)
             {
-           
                 SpawnableHoldQueue.HandleAllSpawnResponseDatas();
                 finishedLoadingLevel = false;
             }
 
-            if (SceneStreamer._session != null && !LevelInQueue())
+            if (MainClass.sceneStreamerLoaded && !LevelInQueue())
             {
-                if (SceneStreamer._session.Status == StreamStatus.DONE)
+                if (MainClass.lastStreamStatus == StreamStatus.DONE)
                 {
-        
                     SpawnableHoldQueue.ClearSpawnResponseDatas();
                 }
             }
