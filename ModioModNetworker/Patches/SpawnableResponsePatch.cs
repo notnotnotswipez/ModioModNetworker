@@ -5,7 +5,7 @@ using ModioModNetworker.Data;
 using ModioModNetworker.Queue;
 using ModioModNetworker.Repo;
 using ModioModNetworker.Utilities;
-using Il2CppSLZ.Marrow.Warehouse;
+using SLZ.Marrow.Warehouse;
 
 namespace ModioModNetworker.Patches
 {

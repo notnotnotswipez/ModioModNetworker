@@ -1,6 +1,6 @@
 using ModioModNetworker.Data;
-using Il2CppSLZ.Marrow.Pool;
-using Il2CppSLZ.Marrow.Warehouse;
+using SLZ.Marrow.Pool;
+using SLZ.Marrow.Warehouse;
 
 namespace ModioModNetworker.Utilities
 {

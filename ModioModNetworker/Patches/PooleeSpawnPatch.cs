@@ -6,9 +6,9 @@ using LabFusion.Senders;
 using MelonLoader;
 using ModioModNetworker.Data;
 using ModioModNetworker.Utilities;
-using Il2CppSLZ;
-using Il2CppSLZ.Marrow.Pool;
-using Il2CppSLZ.Zones;
+using SLZ;
+using SLZ.Marrow.Pool;
+using SLZ.Zones;
 
 namespace ModioModNetworker.Patches
 {

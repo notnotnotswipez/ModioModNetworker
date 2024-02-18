@@ -4,9 +4,9 @@ using BoneLib.Nullables;
 using LabFusion.Network;
 using LabFusion.Utilities;
 using MelonLoader;
-using Il2CppSLZ.Marrow.Data;
-using Il2CppSLZ.Marrow.Pool;
-using Il2CppSLZ.Marrow.Warehouse;
+using SLZ.Marrow.Data;
+using SLZ.Marrow.Pool;
+using SLZ.Marrow.Warehouse;
 using LabFusion.Extensions;
 using UnityEngine;
 

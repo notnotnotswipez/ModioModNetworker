@@ -3,10 +3,10 @@ using BoneLib.Nullables;
 using LabFusion.Network;
 using LabFusion.Utilities;
 using MelonLoader;
-using Il2CppSLZ.Marrow.Data;
-using Il2CppSLZ.Marrow.Pool;
-using Il2CppSLZ.Marrow.SceneStreaming;
-using Il2CppSLZ.Marrow.Warehouse;
+using SLZ.Marrow.Data;
+using SLZ.Marrow.Pool;
+using SLZ.Marrow.SceneStreaming;
+using SLZ.Marrow.Warehouse;
 using UnityEngine;
 
 namespace ModioModNetworker.Queue
@@ -102,7 +102,7 @@ namespace ModioModNetworker.Queue
 
         private static void Handle(SceneLoadData data)
         {
-            FusionSceneManager.SetTargetScene(data.levelBarcode);
+            FusionSceneManager.SetTargetScene(data.levelBarcode, data.loadBarcode);
         }
         
         

@@ -26,9 +26,9 @@ using ModioModNetworker.UI;
 using ModioModNetworker.Utilities;
 using ModIoModNetworker.Ui;
 using Newtonsoft.Json;
-using Il2CppSLZ.Marrow.SceneStreaming;
-using Il2CppSLZ.Marrow.Warehouse;
-using Il2CppSLZ.Rig;
+using SLZ.Marrow.SceneStreaming;
+using SLZ.Marrow.Warehouse;
+using SLZ.Rig;
 using UnityEngine;
 using File = System.IO.File;
 using ZipFile = System.IO.Compression.ZipFile;
@@ -195,7 +195,7 @@ namespace ModioModNetworker
             MultiplayerHooking.OnStartServer += OnStartServer;
             MultiplayerHooking.OnPlayerRepCreated += OnPlayerRepCreated;
             MultiplayerHooking.OnLobbyCategoryCreated += OnLobbyCategoryMade;
-            
+
             MelonLogger.Msg("Populating currently installed mods via this mod.");
             installedMods.Clear();
             InstalledModInfos.Clear();
@@ -207,6 +207,7 @@ namespace ModioModNetworker
             
             melonPreferencesCategory.SaveToFile();
         }
+ 
 
         private void OnLobbyCategoryMade(MenuCategory category, INetworkLobby lobby)
         {

@@ -7,7 +7,7 @@ using LabFusion.Utilities;
 using MelonLoader;
 using ModioModNetworker.Data;
 using ModIoModNetworker.Ui;
-using Il2CppSLZ.Marrow.SceneStreaming;
+using SLZ.Marrow.SceneStreaming;
 
 namespace ModioModNetworker
 {

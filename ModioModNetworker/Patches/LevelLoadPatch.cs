@@ -8,7 +8,7 @@ using ModioModNetworker.Data;
 using ModioModNetworker.Queue;
 using ModioModNetworker.Repo;
 using ModioModNetworker.Utilities;
-using Il2CppSLZ.Marrow.Warehouse;
+using SLZ.Marrow.Warehouse;
 
 namespace ModioModNetworker.Patches
 {
@@ -65,10 +65,10 @@ namespace ModioModNetworker.Patches
             }
         }
         
-        [HarmonyPatch(typeof(LoadSender), "SendLevelLoad", typeof(string), typeof(ulong))]
+        [HarmonyPatch(typeof(LoadSender), "SendLevelLoad", typeof(string), typeof(string), typeof(ulong))]
         private static class SendLevelPatchClass {
             
-            public static void Prefix(string barcode, ulong userId)
+            public static void Prefix(string barcode, string loadBarcode, ulong userId)
             {
                 if (!NetworkInfo.IsServer)
                     return;
@@ -91,10 +91,10 @@ namespace ModioModNetworker.Patches
             }
         }
         
-        [HarmonyPatch(typeof(LoadSender), "SendLevelLoad", typeof(string))]
+        [HarmonyPatch(typeof(LoadSender), "SendLevelLoad", typeof(string), typeof(string))]
         private static class SendLevelPatchClassGeneric {
             
-            public static void Prefix(string barcode)
+            public static void Prefix(string barcode, string loadBarcode)
             {
                 if (!NetworkInfo.IsServer)
                     return;
