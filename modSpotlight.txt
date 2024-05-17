@@ -1,4 +1,4 @@
 manualDisplayMod: null
-subTitle: null
-titleOverride: null
-descriptionOverride: null
+subTitle: RAWW!!!!! SO AWESOME!
+titleOverride: This is 711
+descriptionOverride: That mod by that oone guy
