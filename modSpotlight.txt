@@ -1,4 +1,4 @@
-manualDisplayMod: 3773532
-subTitle: MOD SPOTLIGHT! (Sigma jimmy haha!)
+manualDisplayMod: null
+subTitle: null
 titleOverride: null
 descriptionOverride: null
