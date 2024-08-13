@@ -1,4 +1,4 @@
-manualDisplayMod: 4252966
+manualDisplayMod: null
 subTitle: RAWW!!!!! SO AWESOME!
 titleOverride: This is 711
 descriptionOverride: That mod by that oone guy
