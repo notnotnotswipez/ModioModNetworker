@@ -1,16 +1,19 @@
 using System.Collections.Generic;
+using LabFusion.Entities;
 using LabFusion.Extensions;
 using LabFusion.Representation;
 using ModioModNetworker.Utilities;
-using SLZ.Rig;
-using TMPro;
+using Il2CppSLZ.Rig;
+using Il2CppTMPro;
 using UnityEngine;
+using LabFusion.Player;
+using Il2CppSLZ.Marrow;
 
 namespace ModioModNetworker.UI
 {
     public class AvatarDownloadBar
     {
-        private PlayerRep rep;
+        private NetworkPlayer rep;
         private GameObject bar;
         private GameObject fill;
         private Animator animator;
@@ -26,7 +29,7 @@ namespace ModioModNetworker.UI
 
         public static Dictionary<PlayerId, AvatarDownloadBar> bars = new Dictionary<PlayerId, AvatarDownloadBar>();
 
-        public AvatarDownloadBar(PlayerRep rep)
+        public AvatarDownloadBar(NetworkPlayer rep)
         {
             GameObject go = GameObject.Instantiate(NetworkerAssets.avatarDownloadBarPrefab);
             GameObject.DontDestroyOnLoad(go);
@@ -43,7 +46,7 @@ namespace ModioModNetworker.UI
 
             animator = go.GetComponent<Animator>();
             this.rep = rep;
-            manager = rep.RigReferences.RigManager;
+            manager = rep.RigRefs.RigManager;
             modNameText = go.transform.Find("Bar").Find("ModName").GetComponent<TMP_Text>();
             percentageText = go.transform.Find("Bar").Find("Percentage").GetComponent<TMP_Text>();
             fill = go.transform.Find("Bar").Find("Mask").Find("Fill").gameObject;

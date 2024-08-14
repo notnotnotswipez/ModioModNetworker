@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
+using Il2CppSLZ.Marrow.SceneStreaming;
 using LabFusion.Data;
 using LabFusion.Network;
+using LabFusion.Player;
 using LabFusion.Representation;
 using LabFusion.Utilities;
 using MelonLoader;
 using ModioModNetworker.Data;
 using ModIoModNetworker.Ui;
-using SLZ.Marrow.SceneStreaming;
 
 namespace ModioModNetworker
 {
@@ -103,12 +104,17 @@ namespace ModioModNetworker
                         ModInfo modInfo = data.serializedModInfo.modInfo;
                         if (data.modType != ModlistData.ModType.LIST)
                         {
-                            if (modInfo.isValidMod)
+                            //if (modInfo.isValidMod)
+                            if (true)
                             {
                                 switch (data.modType)
                                 {
                                     case ModlistData.ModType.AVATAR:
                                         {
+
+                                            if (!MainClass.overrideFusionDL) {
+                                                return;
+                                            }
 
                                             if (!avatarMods.ContainsKey(data.playerId))
                                             {
@@ -164,6 +170,12 @@ namespace ModioModNetworker
                                         }
                                     case ModlistData.ModType.SPAWNABLE:
                                         {
+
+                                            if (!MainClass.overrideFusionDL)
+                                            {
+                                                return;
+                                            }
+
                                             float mb = modInfo.fileSizeKB / 1000000;
 
                                             if (MainClass.autoDownloadSpawnables && mb < MainClass.maxAutoDownloadMb)
@@ -203,6 +215,10 @@ namespace ModioModNetworker
                                         }
                                     case ModlistData.ModType.LEVEL:
                                         {
+                                            if (!MainClass.overrideFusionDL)
+                                            {
+                                                return;
+                                            }
 
                                             if (MainClass.useRepo)
                                             {
@@ -253,7 +269,6 @@ namespace ModioModNetworker
                             }
                             if (data.isFinal)
                             {
-                                MelonLogger.Msg("Got modlist data");
                                 NetworkerMenuController.SetHostSubscribedMods(modlist);
                                 modlist.Clear();
                             }

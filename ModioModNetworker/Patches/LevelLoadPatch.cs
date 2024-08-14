@@ -6,9 +6,10 @@ using LabFusion.Utilities;
 using MelonLoader;
 using ModioModNetworker.Data;
 using ModioModNetworker.Queue;
-using ModioModNetworker.Repo;
 using ModioModNetworker.Utilities;
-using SLZ.Marrow.Warehouse;
+using Il2CppSLZ.Marrow.Warehouse;
+using LabFusion.Player;
+using LabFusion.Marrow;
 
 namespace ModioModNetworker.Patches
 {
@@ -21,44 +22,29 @@ namespace ModioModNetworker.Patches
             {
                 if (!NetworkInfo.IsServer && !isServerHandled && MainClass.autoDownloadLevels) {
                     using (var reader = FusionReader.Create(bytes)) {
-                        using (var data = reader.ReadFusionSerializable<SceneLoadData>()) {
-                            
-                            // Clear the level queue no matter what because no matter what outcome it is, we are going to be loading a new level.
-                            LevelHoldQueue.ClearQueue();
+                        var data = reader.ReadFusionSerializable<SceneLoadData>();
 
-                            if (MainClass.confirmedHostHasIt || MainClass.useRepo) {
-                                if (!IsCrate(data.levelBarcode))
+                        if (!MainClass.overrideFusionDL)
+                        {
+                            return true;
+                        }
+
+                        // Clear the level queue no matter what because no matter what outcome it is, we are going to be loading a new level.
+                        LevelHoldQueue.ClearQueue();
+
+                        if (MainClass.confirmedHostHasIt || MainClass.useRepo) {
+                            if (!CrateFilterer.HasCrate<LevelCrate>(new Barcode(data.levelBarcode)))
+                            {
+                                LevelHoldQueue.SetQueue(new LevelHoldQueue.LevelHoldQueueData()
                                 {
-                                    if (MainClass.useRepo) {
-                                        // TODO: REPO DOWN
-                                        string palletBarcode = RepoManager.GetPalletBarcodeFromCrateBarcode(data.levelBarcode);
-                                        string existingNumericalId = RepoManager.GetRepoModInfoFromPalletBarcode(palletBarcode).modNumericalId;
-                                        if (existingNumericalId != null) {
-                                            ModInfo.RequestModInfoNumerical(existingNumericalId, "install_level");
-                                        }
-                                    }
-                                    LevelHoldQueue.SetQueue(new LevelHoldQueue.LevelHoldQueueData()
-                                    {
-                                        missingBarcode = data.levelBarcode,
-                                        _data = data
-                                    });
-                                    return false;
-                                }
+                                    missingBarcode = data.levelBarcode,
+                                    _data = data
+                                });
+                                return false;
                             }
                         }
+
                     }
-                }
-
-                return true;
-            }
-
-            private static bool IsCrate(string barcode)
-            {
-                LevelCrate levelCrate =
-                    AssetWarehouse.Instance.GetCrate<LevelCrate>(barcode);
-                if (levelCrate == null)
-                {
-                    return false;
                 }
 
                 return true;

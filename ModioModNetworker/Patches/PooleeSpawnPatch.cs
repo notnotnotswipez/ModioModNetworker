@@ -6,18 +6,18 @@ using LabFusion.Senders;
 using MelonLoader;
 using ModioModNetworker.Data;
 using ModioModNetworker.Utilities;
-using SLZ;
-using SLZ.Marrow.Pool;
-using SLZ.Zones;
+using Il2CppSLZ;
+using Il2CppSLZ.Marrow.Pool;
+using LabFusion.Player;
 
 namespace ModioModNetworker.Patches
 {
     public class PooleeSpawnPatch
     {
-        [HarmonyPatch(typeof(AssetPoolee), "OnSpawn")]
+        [HarmonyPatch(typeof(Poolee), "OnSpawn")]
         private static class SpawnPatchClass {
             
-            public static void Prefix(AssetPoolee __instance)
+            public static void Prefix(Poolee __instance)
             {
                 if (MainClass.confirmedHostHasIt && NetworkInfo.HasServer)
                 {
@@ -39,10 +39,10 @@ namespace ModioModNetworker.Patches
         }
 
         // Also patch the catchup spawn
-        [HarmonyPatch(typeof(SpawnSender), "SendCatchupSpawn", typeof(byte), typeof(string), typeof(ushort), typeof(SerializedTransform), typeof(ZoneSpawner), typeof(Handedness), typeof(ulong))]
+        [HarmonyPatch(typeof(SpawnSender), "SendCatchupSpawn", typeof(byte), typeof(string), typeof(ushort), typeof(SerializedTransform), typeof(ulong))]
         private static class CatchupSpawnPatch
         {
-            public static void Prefix(byte owner, string barcode, ushort syncId, SerializedTransform serializedTransform, ZoneSpawner spawner, Handedness hand, ulong userId)
+            public static void Prefix(byte owner, string barcode, ushort syncId, SerializedTransform serializedTransform, ulong userId)
             {
                 if (NetworkInfo.IsServer)
                 {

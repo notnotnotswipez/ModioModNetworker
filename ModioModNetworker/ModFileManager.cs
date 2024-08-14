@@ -7,24 +7,27 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
 using System.Security.Policy;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using BoneLib;
+using Il2CppSLZ.Marrow.Pool;
+using Il2CppSLZ.Marrow.SceneStreaming;
+using Il2CppSLZ.Marrow.Warehouse;
+using LabFusion.Player;
 using LabFusion.Representation;
 using LabFusion.Utilities;
 using MelonLoader;
 using ModioModNetworker;
 using ModioModNetworker.Data;
-using ModioModNetworker.Repo;
+
 using ModioModNetworker.UI;
 using ModIoModNetworker.Ui;
 using Newtonsoft.Json;
-using SLZ.Marrow.Pool;
-using SLZ.Marrow.SceneStreaming;
-using SLZ.Marrow.Warehouse;
 using Steamworks.Data;
 using UnityEngine;
 using UnityEngine.Networking;
+using static Il2CppSLZ.Marrow.UnityExtensions.TransformExtensions;
 using AsyncOperation = UnityEngine.AsyncOperation;
 
 namespace ModioModNetworker
@@ -49,7 +52,9 @@ namespace ModioModNetworker
 
         public static DownloadAction activeDownloadAction = null;
         public static DownloadQueueElement activeDownloadQueueElement = null;
-        public static UnityWebRequest activeDownloadWebRequest = null;
+        public static UnityWebRequest activeDownloadWebRequest;
+
+        public static string targetVersionString = "1.1";
 
         //private static WebClient _client;
 
@@ -71,27 +76,31 @@ namespace ModioModNetworker
 
         public static string FindFile(string path, string fileName)
         {
-            // Make a recursive function to find the file
-            foreach (var file in Directory.GetFiles(path))
-            {
-                string[] splitPath = file.Split('\\');
-                string currentFileName = splitPath[splitPath.Length - 1];
-                if (currentFileName.EndsWith(fileName))
+            try {
+                foreach (var file in Directory.GetFiles(path))
                 {
-                    return file;
+                    string[] splitPath = file.Split('\\');
+                    string currentFileName = splitPath[splitPath.Length - 1];
+                    if (currentFileName.EndsWith(fileName))
+                    {
+                        return file;
+                    }
+                }
+
+                // Check subdirectories
+                foreach (var directory in Directory.GetDirectories(path))
+                {
+                    string result = FindFile(directory, fileName);
+                    if (result != "")
+                    {
+                        return result;
+                    }
                 }
             }
 
-            // Check subdirectories
-            foreach (var directory in Directory.GetDirectories(path))
-            {
-                string result = FindFile(directory, fileName);
-                if (result != "")
-                {
-                    return result;
-                }
+            catch (Exception ex) {
+                return "";
             }
-
             return "";
         }
 
@@ -165,9 +174,11 @@ namespace ModioModNetworker
             }
         }
 
-        public static bool AddToQueue(DownloadQueueElement queueElement)
+        public static bool AddToQueue(DownloadQueueElement queueElement, bool ignoreTag = false)
         {
             ModInfo modInfo = queueElement.info;
+
+            MelonLogger.Msg("Added to queue: "+modInfo.modName+" with tag count: "+modInfo.tags.Count);
             // Check if mod is in installed mods
             if (!modInfo.isValidMod)
             {
@@ -184,6 +195,15 @@ namespace ModioModNetworker
             {
                 return false;
             }
+
+            if (!ignoreTag) {
+                // TODO: Change this to be dynamic in some way?
+                if (!modInfo.tags.Contains(targetVersionString))
+                {
+                    return false;
+                }
+            }
+            
 
             if (activeDownloadQueueElement != null)
             {
@@ -237,10 +257,10 @@ namespace ModioModNetworker
             return true;
         }
         
-        public static void DownloadFileUnityWeb(string url, string path)
+        /*public static void DownloadFileUnityWeb(string url, string path)
         {
             UnityWebRequest request = UnityWebRequest.Get(url);
-            request.method = UnityWebRequest.kHttpVerbGET;
+            request.method = "GET";
             request.downloadHandler = new DownloadHandlerFile(path);
             
             activeDownloadWebRequest = request;
@@ -251,9 +271,9 @@ namespace ModioModNetworker
             {
                 OnDownloadFileCompleted();
             });
-        }
+        }*/
 
-        /*public static async Task DownloadFileAsync(string url, string path)
+        public static async Task DownloadFileAsync(string url, string path)
         {
             HttpWebRequest request = (HttpWebRequest) WebRequest.Create(url);
             request.Method = "GET";
@@ -291,7 +311,7 @@ namespace ModioModNetworker
             {
                 MelonLogger.Error("Failed to download file");
             }
-        }*/
+        }
 
         public static void DownloadFile(string url, string path)
         {
@@ -304,7 +324,7 @@ namespace ModioModNetworker
 
             try
             {
-                DownloadFileUnityWeb(url, path);
+                DownloadFileAsync(url, path);
             }
             catch (WebException e)
             {
@@ -383,6 +403,8 @@ namespace ModioModNetworker
             if (searchQuery == "") {
                 extension = "";
             }
+
+            SpotlightOverride.LoadFromRegularURL();
             
             UnityWebRequest httpWebRequest = UnityWebRequest.Get($"https://mod.io/v1/games/@bonelab/mods?_limit=100&_offset={offset}&_sort=-popular"+ extension);
             httpWebRequest.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
@@ -558,23 +580,12 @@ namespace ModioModNetworker
         public static void UnInstallMainThread(string numericalId)
         {
             InstalledModInfo installedModInfo = null;
-            
-            // TODO: REPO DOWN
-            RepoModInfo repoModInfo = null;
 
             foreach (var modInfo in MainClass.InstalledModInfos)
             {
                 if (modInfo.ModInfo.numericalId == numericalId)
                 {
                     installedModInfo = modInfo;
-                }
-            }
-
-            foreach (var repoInfo in MainClass.untrackedInstalledModInfos)
-            {
-                if (repoInfo.modNumericalId == numericalId)
-                {
-                    repoModInfo = repoInfo;
                 }
             }
 
@@ -585,32 +596,15 @@ namespace ModioModNetworker
                     string barcode = installedModInfo.palletBarcode;
                     UnloadPallet(barcode);
 
+                    File.Delete(installedModInfo.manifestPath);
                     // Delete mod folder
-                    string modJsonPath = installedModInfo.modinfoJsonPath;
-                    // Get the directory containing the modinfo.json
-                    if (!HelperMethods.IsAndroid())
-                    {
-                        string folder = modJsonPath.Replace("\\modinfo.json", "");
-                        Directory.Delete(folder, true);
-                    }
-                    else
-                    {
-                        string folder = modJsonPath.Replace("/storage/emulated/0/Android/data/com.StressLevelZero.BONELAB/files/", "").Replace("/modinfo.json", "");
-                        Directory.Delete(folder, true);
-                    }
-                }
+                    MelonLogger.Msg("Catalog path: " + installedModInfo.catalogPath);
+                    MelonLogger.Msg("Catalog parent: " + Directory.GetParent(installedModInfo.catalogPath).FullName);
+                    string parentDirectory = Directory.GetParent(installedModInfo.catalogPath).FullName;
 
-                // TODO: REPO DOWN
-                if (repoModInfo != null)
-                {
-                    string barcode = repoModInfo.palletBarcode;
-                    AssetWarehouse.Instance.UnloadPallet(barcode);
-
-                    // Delete mod folder
-                    string palletJsonPath = repoModInfo.palletJsonPath;
-                    // Get the directory containing the modinfo.json
-                    string folder = palletJsonPath.Replace("\\pallet.json", "");
-                    Directory.Delete(folder, true);
+                    
+                    Directory.Delete(parentDirectory, true);
+                    
                 }
             }
             catch (Exception ex)
@@ -624,12 +618,26 @@ namespace ModioModNetworker
 
         private static void UnloadPallet(string palletBarcode)
         {
+
+            DeleteExistingModObjects(palletBarcode);
+
             try
             {
+                AssetWarehouse.Instance.UnloadPallet(new Barcode(palletBarcode));
+            }
+            catch (Exception e)
+            {
+                // AW might not have been loaded? Or some other issue
+            }
+        }
+
+        public static void DeleteExistingModObjects(string palletBarcode)
+        {
+            try {
                 // Android thing
                 foreach (var pallet in AssetWarehouse.Instance.GetPallets())
                 {
-                    if (pallet._barcode != palletBarcode)
+                    if (pallet._barcode._id != palletBarcode)
                     {
                         continue;
                     }
@@ -643,7 +651,7 @@ namespace ModioModNetworker
                                 continue;
                             }
 
-                            foreach (var assetPoolee in assetPool.spawned)
+                            foreach (var assetPoolee in assetPool._spawned)
                             {
                                 GameObject.Destroy(assetPoolee.gameObject);
                             }
@@ -651,21 +659,15 @@ namespace ModioModNetworker
                     }
                 }
             }
-            catch (Exception e)
-            {
-                MelonLogger.Error("Exception when deleting pallet objects");
+            catch (Exception ex) {
+            
             }
-
-            AssetWarehouse.Instance.UnloadPallet(palletBarcode);
         }
 
         public static void UnInstall(string numericalId)
         {
             InstalledModInfo installedModInfo = null;
             
-            // TODO: REPO DOWN
-            RepoModInfo repoModInfo = null;
-
             foreach (var modInfo in MainClass.InstalledModInfos)
             {
                 if (modInfo.ModInfo.numericalId == numericalId)
@@ -674,14 +676,6 @@ namespace ModioModNetworker
                 }
             }
 
-            // TODO: REPO DOWN
-            foreach (var repoInfo in MainClass.untrackedInstalledModInfos)
-            {
-                if (repoInfo.modNumericalId == numericalId)
-                {
-                    repoModInfo = repoInfo;
-                }
-            }
 
             Thread thread = new Thread(() =>
             {
@@ -695,44 +689,12 @@ namespace ModioModNetworker
                         });
 
                         // Delete mod folder
-                        string modJsonPath = installedModInfo.modinfoJsonPath;
-                        // Get the directory containing the modinfo.json
-                        if (!HelperMethods.IsAndroid())
-                        {
-                            string folder = modJsonPath.Replace("\\modinfo.json", "");
-                            Directory.Delete(folder, true);
-                        }
-                        else
-                        {
-                            string folder = modJsonPath.Replace("/storage/emulated/0/Android/data/com.StressLevelZero.BONELAB/files/", "").Replace("/modinfo.json", "");
-                            Directory.Delete(folder, true);
-                        }
-
-                    }
-
-                    // TODO: REPO DOWN
-                    if (repoModInfo != null)
-                    {
-                        string barcode = repoModInfo.palletBarcode;
-                        MainThreadManager.QueueAction(() =>
-                        {
-                            AssetWarehouse.Instance.UnloadPallet(barcode);
-                        });
-
+                        File.Delete(installedModInfo.manifestPath);
                         // Delete mod folder
-                        string palletJsonPath = repoModInfo.palletJsonPath;
-                        // Get the directory containing the modinfo.json
+                        MelonLogger.Msg("Catalog path: " + installedModInfo.catalogPath);
+                        string parentDirectory = Directory.GetParent(installedModInfo.catalogPath).FullName;
+                        Directory.Delete(parentDirectory, true);
 
-                        if (!HelperMethods.IsAndroid())
-                        {
-                            string folder = palletJsonPath.Replace("\\pallet.json", "");
-                            Directory.Delete(folder, true);
-                        }
-                        else
-                        {
-                            string folder = palletJsonPath.Replace("/storage/emulated/0/Android/data/com.StressLevelZero.BONELAB/files/", "").Replace("/pallet.json", "");
-                            Directory.Delete(folder, true);
-                        }
                     }
                 }
                 catch (Exception ex)
@@ -937,7 +899,8 @@ public class DownloadAction
                 
                 while (palletJsonFile != "")
                 {
-                    string modFolder = palletJsonFile.Replace("\\pallet.json", "").Replace("/pallet.json", "");
+                    string modFolder = Directory.GetParent(palletJsonFile).FullName;
+                    MelonLogger.Msg("Mod folder is: " + modFolder);
                     // Make folder in mods folder named after the first directory
                     string[] split;
                     
@@ -955,28 +918,35 @@ public class DownloadAction
                     // Make directory in mods folder
                     bool existing = false;
 
+                    MelonLogger.Msg("Checking directory if it exists: "+modFolderDestination);
                     if (Directory.Exists(modFolderDestination))
                     {
+                        MelonLogger.Msg("Directory exists: " + modFolderDestination);
                         existing = true;
                         string existingPalletJson = ModFileManager.FindFile(modFolderDestination, "pallet.json");
                         string fileContents = File.ReadAllText(existingPalletJson);
                         var jsonData = (dynamic) JsonConvert.DeserializeObject<dynamic>(fileContents);
-                        string palletId = (string) jsonData["objects"]["o:1"]["barcode"];
+                        string palletId = (string) jsonData["objects"]["1"]["barcode"];
                         MainClass.warehousePalletReloadTargets.Add(palletId);
                         Directory.Delete(modFolderDestination, true);
                     }
 
-                    if (!existing)
-                    {
-                        MainClass.warehouseReloadFolders.Add(modFolderDestination);
-                    }
+                    MelonLogger.Msg("Mod is existing: " + existing);
                     
+
                     Directory.Move(modFolder, modFolderDestination);
                     // Create modinfo.json
                     string modInfoPath = modFolderDestination + "/modinfo.json";
+                    
                     string modInfoJson = (string) JsonConvert.SerializeObject(ModlistMenu.activeDownloadModInfo);
                     File.WriteAllText(modInfoPath, modInfoJson);
-                    
+
+                    if (!existing)
+                    {
+
+                        MainClass.warehouseReloadFolders.Add(ModFileManager.FindFile(modFolderDestination, "pallet.json"));
+                    }
+
                     // Add to installed mods
                     palletJsonFile = ModFileManager.FindFile(exportDirectory, "pallet.json");
                     MelonLogger.Msg(modFolder + " Downloaded and extracted!");

@@ -1,4 +1,5 @@
 using HarmonyLib;
+using LabFusion.Entities;
 using LabFusion.Syncables;
 using ModioModNetworker.Queue;
 using ModioModNetworker.Utilities;
@@ -7,7 +8,7 @@ namespace ModioModNetworker.Patches
 {
     public class SyncableCleanupPatch
     {
-        [HarmonyPatch(typeof(SyncManager), "OnCleanup")]
+        [HarmonyPatch(typeof(NetworkEntityManager), "OnCleanupEntities")]
         private static class CleanupPatchClass {
             public static void Prefix()
             {

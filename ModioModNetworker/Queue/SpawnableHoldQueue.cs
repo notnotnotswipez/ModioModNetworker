@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
-using BoneLib.Nullables;
 using LabFusion.Network;
 using LabFusion.Utilities;
 using MelonLoader;
-using SLZ.Marrow.Data;
-using SLZ.Marrow.Pool;
-using SLZ.Marrow.Warehouse;
+using Il2CppSLZ.Marrow.Data;
+using Il2CppSLZ.Marrow.Pool;
+using Il2CppSLZ.Marrow.Warehouse;
+using LabFusion.Extensions;
 using UnityEngine;
+using LabFusion.Marrow;
 
 namespace ModioModNetworker.Queue
 {
@@ -73,12 +74,12 @@ namespace ModioModNetworker.Queue
 
             byte owner = data.owner;
             string barcode = data.barcode;
-            ushort syncId = data.syncId;
-            string path = data.spawnerPath;
-            var hand = data.hand;
+            ushort syncId = data.entityId;
+            uint trackerId = data.trackerId;
 
-            NullableMethodExtensions.PoolManager_Spawn(spawnable, data.serializedTransform.position, data.serializedTransform.rotation.Expand(), null,
-                true, null, (Action<GameObject>)((go) => { SpawnResponseMessage.OnSpawnFinished(owner, barcode, syncId, go, path, hand); }), null);
+            SafeAssetSpawner.Spawn(spawnable, data.serializedTransform.position, data.serializedTransform.rotation, (go) => {
+                SpawnResponseMessage.OnSpawnFinished(owner, barcode, syncId, go, trackerId);
+            });
         }
     }
     

@@ -3,7 +3,7 @@ using LabFusion.Network;
 using MelonLoader;
 using ModioModNetworker;
 using ModioModNetworker.Data;
-using ModioModNetworker.Repo;
+
 using ModioModNetworker.UI;
 using ModioModNetworker.Utilities;
 using Steamworks.Ugc;
@@ -12,7 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using TMPro;
+using Il2CppTMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -92,10 +92,13 @@ namespace ModIoModNetworker.Ui
 
         public static NetworkerMenuController instance;
 
+        public static SpotlightOverride spotlightOverride = new SpotlightOverride();
+
         
         void Awake()
         {
             instance = this;
+
             selector = transform.Find("Selector");
 
             modIoTab = transform.Find("ModIoTab").gameObject;
@@ -105,7 +108,7 @@ namespace ModIoModNetworker.Ui
 
             Button backButton = transform.Find("BackButton").GetComponent<Button>();
             backButton.onClick.AddListener(new Action(() => {
-                MenuManager.SelectCategory(MenuManager.RootCategory);
+                Menu.OpenPage(Page.Root);
             }));
 
             Button uninstallUnsubscribedConfirm = filesTab.transform.Find("Confirmer").Find("Confirm").Find("Button").GetComponent<Button>();
@@ -133,6 +136,19 @@ namespace ModIoModNetworker.Ui
             Button refreshSubscribedButton = modIoTab.transform.Find("RefreshSubscribedButton").Find("Button").GetComponent<Button>();
             refreshSubscribedButton.onClick.AddListener(new Action(() => {
                 MainClass.PopulateSubscriptions();
+            }));
+
+            Button expandedThumbButton = modIoTab.transform.Find("TrendingFirstPage").Find("BigBanner").Find("ThumbnailMaskMovedSlight").Find("Button").GetComponent<Button>();
+            expandedThumbButton.onClick.AddListener(new Action(() =>
+            {
+                if (spotlightOverride.manualDisplayId != null)
+                {
+                    TriggerModInfoPopup(true, spotlightOverride.downloadedInfo);
+                }
+                else {
+                    TriggerModInfoPopup(true, modIoRetrieved[0]);
+                }
+
             }));
 
             Button searchButton = modIoTab.transform.Find("SearchIcon").GetComponent<Button>();
@@ -567,6 +583,7 @@ namespace ModIoModNetworker.Ui
                     maxPages = (int) Math.Ceiling((double) totalInstalled.Count / (double) maxDisplayPerPage);
                     UpdateArrowDisplays();
                     PopulateFiles(pageNumber);
+                    
                     break;
                 case InstalledSort.SUBSCRIBED:
                     filesTab.transform.Find("GridLayout").gameObject.SetActive(true);
@@ -614,8 +631,7 @@ namespace ModIoModNetworker.Ui
                     string modDisplay = original;
                     bool isNumeric = int.TryParse(modDisplay, out int n);
                     if (isNumeric) {
-                        // TODO: REPO DOWN
-                        modDisplay = RepoManager.GetRepoModInfoFromModId(modDisplay).modName;
+                        modDisplay = "Numeric Listing: "+n;
                     }
                     GameObject blacklistDisplay = Instantiate(NetworkerAssets.blacklistDisplayPrefab);
                     TMP_Text displayName = blacklistDisplay.transform.Find("BlacklistedMod").gameObject.GetComponent<TMP_Text>();
@@ -654,12 +670,185 @@ namespace ModIoModNetworker.Ui
         }
 
         void PopulateModIoTab(int page) {
-            GameObject gridView = modIoTab.transform.Find("GridLayout").gameObject;
 
-            int childCount = gridView.transform.childCount;
+            if (page > 0 || searching)
+            {
+                GameObject gridView = modIoTab.transform.Find("GridLayout").gameObject;
+                GameObject trendingFirstPage = modIoTab.transform.Find("TrendingFirstPage").gameObject;
+
+   
+                trendingFirstPage.SetActive(false);
+                gridView.SetActive(true);
+
+                ClearAllChildren(gridView.transform);
+
+                // TODO: set max display to 4 if we are trending and on the first page
+                // Also switch destination parent to the trending one
+                // If we are not viewing trending (And rather, a specified mod), offset by 1 by adding
+                // Apply that given offset to the target below?
+                // Subtract 4 from starting otherwise 
+
+                int starting = maxDisplayPerPage * page;
+
+                if (!searching) {
+                    // Account for the two missing
+                    if (starting > 0) {
+                        starting -= 2;
+                    }
+
+                    // Account for the extra missing because we aren't listing it in 1 2 3 order anymore
+                    
+                    if (spotlightOverride.manualDisplayId != null)
+                    {
+                        starting -= 1;
+                    }
+                }
+
+                for (int i = 0; i < maxDisplayPerPage; i++)
+                {
+                    if (modIoRetrieved.Count > starting + i)
+                    {
+                        ModInfo modInfo = modIoRetrieved[starting + i];
+                        MakeModInfoObject(gridView.transform, modInfo);
+    
+                    }
+                }
+            }
+            else {
+                // Handle it specially
+                GameObject gridView = modIoTab.transform.Find("GridLayout").gameObject;
+
+                Transform trendingFirstPageTransform = modIoTab.transform.Find("TrendingFirstPage");
+                GameObject trendingFirstPage = trendingFirstPageTransform.gameObject;
+                Transform bigBanner = trendingFirstPageTransform.Find("BigBanner");
+
+                trendingFirstPage.SetActive(true);
+                gridView.SetActive(false);
+
+                Transform secondaryGridView = trendingFirstPageTransform.Find("GridLayoutTrending");
+                Transform individualSpecialSpawn = trendingFirstPageTransform.Find("ModInfoSpawnPoint");
+
+                ClearAllChildren(secondaryGridView);
+                ClearAllChildren(individualSpecialSpawn);
+
+
+                int starting = 1;
+
+                if (spotlightOverride.manualDisplayId != null) {
+                    starting--;
+                }
+
+                if (modIoRetrieved.Count == 0)
+                {
+                    bigBanner.gameObject.SetActive(false);
+                    return;
+                }
+                else
+                {
+                    bigBanner.gameObject.SetActive(true);
+                }
+
+                GameObject intentionalSpawn = MakeModInfoObject(individualSpecialSpawn, modIoRetrieved[starting]);
+                RectTransform spawnRect = intentionalSpawn.GetComponent<RectTransform>();
+                RectTransform destRect = individualSpecialSpawn.GetComponent<RectTransform>();
+
+                spawnRect.position = destRect.position;
+
+                starting++;
+
+                for (int i = 0; i < 4; i++) {
+
+                    if (modIoRetrieved.Count > starting + i)
+                    {
+                        ModInfo modInfo = modIoRetrieved[starting + i];
+                        MakeModInfoObject(secondaryGridView, modInfo);
+                    }
+                }
+
+                
+                TMP_Text modTitleText = bigBanner.Find("ModTitleText").GetComponent<TMP_Text>();
+                TMP_Text descriptionText = bigBanner.Find("Description").GetComponent<TMP_Text>();
+
+                Transform thumbMask = bigBanner.Find("ThumbnailMaskMovedSlight");
+                RawImage thumbNail = thumbMask.Find("LargeThumbnail").GetComponent<RawImage>();
+
+                
+
+                ModInfo targetInfo = modIoRetrieved[0];
+
+                if (spotlightOverride.downloadedInfo != null) {
+
+                    targetInfo = spotlightOverride.downloadedInfo;
+                }
+
+                /*if (spotlightOverride.cachedThumbnail != null)
+                {
+                    thumbNail.texture = spotlightOverride.cachedThumbnail;
+                }
+                else {
+                    ThumbnailThreader.DownloadThumbnail(targetInfo.thumbnailLink, (texture =>
+                    {
+                        if (thumbNail)
+                        {
+                            thumbNail.texture = texture;
+                        }
+
+                        spotlightOverride.cachedThumbnail = texture;
+                    }));
+                }*/
+
+                MelonLogger.Msg("Downloading thumbnail for spotlight!");
+
+                ThumbnailThreader.DownloadThumbnail(targetInfo.thumbnailLink, (texture =>
+                {
+                    MelonLogger.Msg("Downloaded thumbnail for spotlight!");
+                    if (thumbNail)
+                    {
+                        thumbNail.texture = texture;
+                    }
+
+                    spotlightOverride.cachedThumbnail = texture;
+                }));
+
+
+                GameObject bottomBar = thumbMask.transform.Find("BottomBar").gameObject;
+
+                if (spotlightOverride.subTitle != null)
+                {
+                    bottomBar.SetActive(true);
+                    TMP_Text titleText = bottomBar.transform.Find("OptionalTitle").GetComponent<TMP_Text>();
+
+                    titleText.text = spotlightOverride.subTitle;
+                }
+                else {
+                    bottomBar.SetActive(false);
+                }
+
+                if (spotlightOverride.titleOverride != null)
+                {
+                    modTitleText.text = spotlightOverride.titleOverride;
+                }
+                else {
+                    modTitleText.text = targetInfo.modName;
+                }
+
+                if (spotlightOverride.descriptionOverride != null)
+                {
+                    descriptionText.text = spotlightOverride.descriptionOverride;
+                }
+                else
+                {
+                    descriptionText.text = targetInfo.modSummary;
+                }
+            }
+            
+        }
+
+        void ClearAllChildren(Transform parent) {
+            int childCount = parent.childCount;
             for (int i = 0; i < childCount; i++)
             {
-                Transform child = gridView.transform.GetChild(i);
+                Transform child = parent.GetChild(i);
                 ModInfoDisplay modInfoDisplay = child.GetComponentInChildren<ModInfoDisplay>();
 
                 if (modInfoDisplay)
@@ -669,23 +858,25 @@ namespace ModIoModNetworker.Ui
                 }
                 Destroy(child.gameObject);
             }
+        }
 
-            int starting = maxDisplayPerPage * page;
-            for (int i = 0; i < maxDisplayPerPage; i++)
-            {
-                if (modIoRetrieved.Count > starting + i)
-                {
-                    ModInfo modInfo = modIoRetrieved[starting + i];
-                    GameObject modInfoPanel = Instantiate(NetworkerAssets.modInfoDisplay);
-                    ModInfoDisplay modInfoDisplay = modInfoPanel.AddComponent<ModInfoDisplay>();
-                    modInfoDisplay.SetModInfo(modInfo);
-                    modInfoDisplay.controller = this;
-                    modInfoPanel.transform.parent = gridView.transform;
-                    modInfoPanel.transform.localPosition = Vector3.forward;
-                    modInfoPanel.transform.localRotation = Quaternion.identity;
-                    modInfoPanel.transform.localScale = Vector3.one;
-                }
+        GameObject MakeModInfoObject(Transform parent, ModInfo modInfo, bool zeroPosition = true) {
+
+
+            GameObject modInfoPanel = Instantiate(NetworkerAssets.modInfoDisplay);
+            ModInfoDisplay modInfoDisplay = modInfoPanel.AddComponent<ModInfoDisplay>();
+            modInfoDisplay.SetModInfo(modInfo);
+            modInfoDisplay.controller = this;
+            modInfoPanel.transform.parent = parent.transform;
+
+            if (zeroPosition) {
+                modInfoPanel.transform.localPosition = Vector3.forward;
+                modInfoPanel.transform.localRotation = Quaternion.identity;
             }
+            
+            modInfoPanel.transform.localScale = Vector3.one;
+
+            return modInfoPanel;
         }
 
         void PopulateFiles(int page) {
@@ -717,7 +908,6 @@ namespace ModIoModNetworker.Ui
                 {
                     if (!modInfo.IsSubscribed())
                     {
-
                         continue;
                     }
                 }
@@ -784,14 +974,14 @@ namespace ModIoModNetworker.Ui
         void PopulateSettings(int page)
         {
             GameObject settingsHolder = settingsTab.transform.Find("SettingsHolder").gameObject;
-
+         
             int childCount = settingsHolder.transform.childCount;
             for (int i = 0; i < childCount; i++)
             {
                 Transform child = settingsHolder.transform.GetChild(i);
                 Destroy(child.gameObject);
             }
-
+         
             int starting = 3 * page;
             for (int i = 0; i < 3; i++)
             {
@@ -810,6 +1000,7 @@ namespace ModIoModNetworker.Ui
                 case Panels.FILES:
                     SetSelectorDesired(filesTabButton.transform.parent.Find("SelectorDesiredPos"));
                     SetFilterMode(chosenSort);
+                    MainClass.refreshInstalledModsRequested = true;
                     break;
                 case Panels.MODIO:
                     maxPages = (int) Math.Ceiling((double) modIoRetrieved.Count / (double) maxDisplayPerPage);

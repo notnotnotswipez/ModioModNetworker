@@ -1,40 +1,41 @@
 using ModioModNetworker.Data;
-using SLZ.Marrow.Pool;
-using SLZ.Marrow.Warehouse;
+using Il2CppSLZ.Marrow.Pool;
+using Il2CppSLZ.Marrow.Warehouse;
+using LabFusion.Marrow;
 
 namespace ModioModNetworker.Utilities
 {
     public class ModInfoUtilities
     {
-        public static ModInfo GetModInfoForPoolee(AssetPoolee assetPoolee)
+        public static ModInfo GetModInfoForPoolee(Poolee assetPoolee)
         {
-            string palletBarcode = assetPoolee.spawnableCrate._pallet._barcode;
+            string palletBarcode = assetPoolee.SpawnableCrate._pallet._barcode._id;
             return GetModInfoForPalletBarcode(palletBarcode);
         }
         
         public static ModInfo GetModInfoForLevelBarcode(string barcode)
         {
             LevelCrate levelCrate =
-                AssetWarehouse.Instance.GetCrate<LevelCrate>(barcode);
+                CrateFilterer.GetCrate<LevelCrate>(new Barcode(barcode));
             if (levelCrate == null)
             {
                 return null;
             }
 
-            string palletBarcode = levelCrate._pallet._barcode;
+            string palletBarcode = levelCrate._pallet._barcode._id;
             return GetModInfoForPalletBarcode(palletBarcode);
         }
         
         public static ModInfo GetModInfoForSpawnableBarcode(string barcode)
         {
             GameObjectCrate gameObjectCrate =
-                AssetWarehouse.Instance.GetCrate<GameObjectCrate>(barcode);
+                CrateFilterer.GetCrate<GameObjectCrate>(new Barcode(barcode));
             if (gameObjectCrate == null)
             {
                 return null;
             }
 
-            string palletBarcode = gameObjectCrate._pallet._barcode;
+            string palletBarcode = gameObjectCrate._pallet._barcode._id;
             return GetModInfoForPalletBarcode(palletBarcode);
         }
 

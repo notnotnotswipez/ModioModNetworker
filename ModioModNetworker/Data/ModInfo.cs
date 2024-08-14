@@ -1,13 +1,17 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using BoneLib;
+using Il2CppSLZ.Marrow.Forklift.Model;
 using Il2CppSystem.IO;
+using LabFusion.Player;
 using LabFusion.Representation;
 using LabFusion.Utilities;
 using MelonLoader;
+using ModIoModNetworker.Ui;
 using Newtonsoft.Json;
 using UnityEngine;
 
@@ -41,6 +45,8 @@ namespace ModioModNetworker.Data
         public double modDownloadPercentage;
         public string numericalId;
         public string version = "0.0.0";
+        public List<string> tags = new List<string>();
+        public string author = "Networker";
         public int structureVersion = 0;
         public bool temp = false;
 
@@ -134,6 +140,61 @@ namespace ModioModNetworker.Data
             return isInstalled;
         }
 
+        public ModListing ToModListing() {
+            ModListing modListing = new ModListing();
+            modListing.Author = "ModIoModNetworker";
+            modListing.Title = modId;
+            modListing.Description = modSummary;
+            modListing.ThumbnailUrl = thumbnailLink;
+            modListing.Version = version;
+   
+            modListing.Targets = new StringModTargetListingDictionary();
+
+            ModIOModTarget modTarget = new ModIOModTarget();
+            modTarget.ThumbnailOverride = null;
+            
+            modTarget.GameId = 3809;
+            modTarget.ModId = long.Parse(numericalId);
+            modTarget.ModfileId = long.Parse(windowsDownloadLink.Split("/files/")[1].Replace("/download", ""));
+
+            modListing.Targets.Add("pc", modTarget);
+
+            ModIOModTarget androidTarget = new ModIOModTarget();
+            androidTarget.ThumbnailOverride = null;
+
+            androidTarget.GameId = 3809;
+            androidTarget.ModId = long.Parse(numericalId);
+            androidTarget.ModfileId = long.Parse(androidDownloadLink.Split("/files/")[1].Replace("/download", ""));
+
+            modListing.Targets.Add("android", androidTarget);
+
+            string infoString = $"networker;{mature};{temp};{fileSizeKB};{fileName};{structureVersion};{modName};{tags.Count}";
+            foreach (var tag in tags) {
+                infoString += ";" + tag;
+            }
+            modListing.Targets.Add(infoString, modTarget);
+
+            return modListing;
+
+        }
+
+        public void PopulateFromInfoString(string targetString)
+        {
+            string[] split = targetString.Split(";");
+            mature = bool.Parse(split[1]);
+            temp = bool.Parse(split[2]);
+            fileSizeKB = float.Parse(split[3]);
+            fileName = split[4];
+            structureVersion = int.Parse(split[5]);
+            modName = split[6];
+            int tagCount = int.Parse(split[7]);
+            int target = 8;
+            for (int i = 0; i < tagCount; i++) {
+                tags.Add(split[i + target]);
+            }
+            isValidMod = true;
+        }
+
         public static void SetFinishedAction(Action action)
         {
             onFinished = action;
@@ -159,13 +220,13 @@ namespace ModioModNetworker.Data
 
             ModFileManager.GetRawModInfoJson(modIdNumerical, (totalModInfo) =>
             {
-                if (totalModInfo == null)
+                if ((object)totalModInfo == null)
                 {
                     return;
                 }
 
                 string modId = (string) totalModInfo["name_id"];
-                bool mature = (int)totalModInfo["maturity_option"] > 0;
+                bool mature = ((int) totalModInfo["maturity_option"]) > 0;
                 ModFileManager.GetJson("@" + modId, (json) =>
                 {
                     modInfoThreadRequests.Enqueue(new ModInfoThreadRequest()
@@ -213,6 +274,22 @@ namespace ModioModNetworker.Data
                 {
                     ModlistMenu._modInfos.Add(info);
                 }));
+            }
+            else if (destination == "spotlight") {
+
+                action = new Action<ModInfo>((info =>
+                {
+                    NetworkerMenuController.spotlightOverride.downloadedInfo = info;
+      
+
+                    if (NetworkerMenuController.spotlightOverride.cachedThumbnail) {
+                        GameObject.Destroy(NetworkerMenuController.spotlightOverride.cachedThumbnail);
+                    }
+
+                    NetworkerMenuController.spotlightOverride.cachedThumbnail = null;
+                }));
+
+                
             }
             else if (destination == "install_level") {
                 action = new Action<ModInfo>((info =>
@@ -339,8 +416,10 @@ namespace ModioModNetworker.Data
             try
             {
                 var jsonData = JsonConvert.DeserializeObject<dynamic>(json);
+
+
                 // Get data array and loop through it
-                var data = jsonData["data"];
+                dynamic data = jsonData["data"];
 
                 if (data == null)
                 {
@@ -357,6 +436,7 @@ namespace ModioModNetworker.Data
 
                 string prevVersion = "0.0.0";
                 string prevAntiVersion = "0.0.0";
+
 
                 foreach (var mod in data)
                 {
@@ -445,6 +525,11 @@ namespace ModioModNetworker.Data
                         modInfo.thumbnailLink = thumbnailLink;
                         modInfo.modSummary = summary;
                         modInfo.numericalId = numericalId;
+                        modInfo.author = (string) originalModInfo["submitted_by"]["username"];
+
+                        foreach (var tag in originalModInfo["tags"]) {
+                            modInfo.tags.Add((string)tag["name"]);
+                        }
                     }
 
 
@@ -494,6 +579,7 @@ namespace ModioModNetworker.Data
             }
             catch (Exception e)
             {
+                MelonLogger.Error(e);
                 modInfo.isValidMod = false;
                 action.Invoke(modInfo);
                 return;

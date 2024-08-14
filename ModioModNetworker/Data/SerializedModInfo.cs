@@ -2,7 +2,6 @@ using LabFusion.Data;
 using LabFusion.Extensions;
 using LabFusion.Network;
 using LabFusion.Utilities;
-using ModioModNetworker.Repo;
 
 namespace ModioModNetworker.Data
 {
@@ -14,9 +13,13 @@ namespace ModioModNetworker.Data
         private float fileSize;
         private string windowsDownloadLink;
         private string androidDownloadLink;
+        private string thumbnailUrl;
+        private string summary;
+        private string modName;
         private string numericalId;
         private string versionNumber;
         private string modId;
+        private List<string> tags;
         
         public static SerializedModInfo Create(ModInfo info)
         {
@@ -29,7 +32,11 @@ namespace ModioModNetworker.Data
                 windowsDownloadLink = info.windowsDownloadLink,
                 androidDownloadLink = info.androidDownloadLink,
                 numericalId = info.numericalId,
-                versionNumber = info.version
+                versionNumber = info.version,
+                tags = info.tags,
+                modName = info.modName,
+                thumbnailUrl = info.thumbnailLink,
+                summary = info.modSummary
             };
         }
         
@@ -38,15 +45,25 @@ namespace ModioModNetworker.Data
             valid = reader.ReadBoolean();
             mature = reader.ReadBoolean();
             fileSize = reader.ReadSingle();
+            numericalId = reader.ReadUInt64()+"";
             string received = reader.ReadString();
             string[] split = received.Split(StringExtensions.UniqueSeparator);
-            numericalId = split[0];
-            versionNumber = split[1];
-            windowsDownloadLink = split[2];
-            androidDownloadLink = split[3];
-            modId = split[4];
+            versionNumber = split[0];
+            windowsDownloadLink = split[1];
+            androidDownloadLink = split[2];
+            modId = split[3];
+            thumbnailUrl = split[4];
+            summary = split[5];
+            modName  = split[6];
+            int tagCount  = int.Parse(split[7]);
+            List<string> tags = new List<string>();
 
-            RepoModInfo repoModInfo = RepoManager.GetRepoModInfoFromModId(numericalId);
+            int starting = 8;
+
+            for (int i = 0; i < tagCount; i++) {
+                tags.Add(split[i + starting]);
+            }
+
             modInfo = new ModInfo
             {
                 structureVersion = ModInfo.globalStructureVersion,
@@ -58,13 +75,12 @@ namespace ModioModNetworker.Data
                 windowsDownloadLink = windowsDownloadLink,
                 androidDownloadLink = androidDownloadLink,
                 fileSizeKB = fileSize,
-                fileName = modId+".zip"
+                fileName = modId + ".zip",
+                modSummary = summary,
+                thumbnailLink = thumbnailUrl,
+                modName = modName,
+                tags = tags
             };
-            if (repoModInfo != null) {
-                modInfo.modSummary = repoModInfo.summary;
-                modInfo.modName = repoModInfo.modName;
-                modInfo.thumbnailLink = repoModInfo.thumbnailLink;
-            }
         }
 
         public void Serialize(FusionWriter writer)
@@ -72,12 +88,20 @@ namespace ModioModNetworker.Data
             writer.Write(valid);
             writer.Write(mature);
             writer.Write(fileSize);
+            writer.Write(ulong.Parse(numericalId));
             string built = "";
-            built += numericalId + StringExtensions.UniqueSeparator;
             built += versionNumber + StringExtensions.UniqueSeparator;
             built += windowsDownloadLink + StringExtensions.UniqueSeparator;
             built += androidDownloadLink + StringExtensions.UniqueSeparator;
-            built += modId;
+            built += modId + StringExtensions.UniqueSeparator;
+            built += thumbnailUrl + StringExtensions.UniqueSeparator;
+            built += summary + StringExtensions.UniqueSeparator;
+            built += modName + StringExtensions.UniqueSeparator;
+            built += tags.Count;
+
+            foreach (var tag in tags) {
+                built += StringExtensions.UniqueSeparator + tag;
+            }
             writer.Write(built);
         }
     }

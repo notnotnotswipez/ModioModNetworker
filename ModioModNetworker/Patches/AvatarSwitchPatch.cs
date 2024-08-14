@@ -5,16 +5,16 @@ using LabFusion.Representation;
 using LabFusion.Senders;
 using MelonLoader;
 using ModioModNetworker.Data;
-using ModioModNetworker.Repo;
-using SLZ.Marrow.SceneStreaming;
-using SLZ.Marrow.Warehouse;
+using Il2CppSLZ.Marrow.SceneStreaming;
+using Il2CppSLZ.Marrow.Warehouse;
+using LabFusion.Player;
 
 namespace ModioModNetworker.Patches
 {
     public class AvatarSwitchPatch
     {
         // TODO: REPO DOWN
-        [HarmonyPatch(typeof(PlayerRep), "OnSwapAvatar")]
+        /*[HarmonyPatch(typeof(PlayerRep), "OnSwapAvatar")]
         public class OnRepSwapAvatarPatch {
             public static void Postfix(PlayerRep __instance, bool success) {
                 if (!success && MainClass.useRepo && MainClass.autoDownloadAvatars)
@@ -39,7 +39,7 @@ namespace ModioModNetworker.Patches
                     }
                 }
             }
-        }
+        }*/
 
 
         [HarmonyPatch(typeof(PlayerSender), "SendPlayerAvatar")]
@@ -52,7 +52,7 @@ namespace ModioModNetworker.Patches
                     ModInfo avatarModInfo = null;
                     foreach (var installedModInfo in MainClass.InstalledModInfos)
                     {
-                        if (installedModInfo.palletBarcode == RigData.RigReferences.RigManager._avatarCrate.Crate._pallet._barcode)
+                        if (installedModInfo.palletBarcode == RigData.Refs.RigManager._avatarCrate.Crate._pallet._barcode._id)
                         {
                             avatarModInfo = installedModInfo.ModInfo;
                             break;
