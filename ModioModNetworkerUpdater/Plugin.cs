@@ -48,7 +48,7 @@ namespace ModioModNetworkerUpdater
             _offlineModePref = _prefCategory.CreateEntry("OfflineMode", false);
             _prefCategory.SaveToFile(false);
 
-            LoggerInstance.Msg(IsOffline ? ConsoleColor.Yellow : ConsoleColor.Green, IsOffline ? "Mod Io Mod Networker Auto-Updater is OFFLINE." : "Mod Io Mod Networker is ONLINE.");
+            LoggerInstance.Msg(IsOffline ? System.Drawing.Color.Yellow : System.Drawing.Color.Green, IsOffline ? "Mod Io Mod Networker Auto-Updater is OFFLINE." : "Mod Io Mod Networker is ONLINE.");
 
             if (IsOffline) {
                 if (!File.Exists(ModAssemblyPath)) {

@@ -9,20 +9,9 @@ using System.Runtime.InteropServices;
 
 using ModioModNetworkerUpdater;
 using MelonLoader;
-
-[assembly: AssemblyTitle(ModioModNetworkerUpdaterPlugin.Name)]
-[assembly: AssemblyDescription("")]
-[assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany(null)]
-[assembly: AssemblyProduct(ModioModNetworkerUpdaterPlugin.Name)]
-[assembly: AssemblyCopyright("Created by " + ModioModNetworkerUpdaterPlugin.Author)]
 [assembly: AssemblyTrademark(null)]
 [assembly: AssemblyCulture("")]
 [assembly: ComVisible(false)]
-//[assembly: Guid("")]
-[assembly: AssemblyVersion("1.0.0")]
-[assembly: AssemblyFileVersion("1.0.0")]
-[assembly: NeutralResourcesLanguage("en")]
 [assembly: MelonInfo(typeof(ModioModNetworkerUpdaterPlugin), ModioModNetworkerUpdaterPlugin.Name, "1.0.0", ModioModNetworkerUpdaterPlugin.Author, null)]
 
 [assembly: MelonGame("Stress Level Zero", "BONELAB")]

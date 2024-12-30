@@ -8,7 +8,7 @@ using LabFusion.SDK.Modules;
 
 // ...
 [assembly: MelonInfo(typeof(MainClass), "ModioModNetworker", ModioModNetworkerUpdaterVersion.versionString, "notnotnotswipez")]
-[assembly: ModuleInfo(typeof(ModlistModule), "ModioModNetworkerModule", ModioModNetworkerUpdaterVersion.versionString, "notnotnotswipez", "modiomodule", true, ConsoleColor.DarkCyan)]
+//[assembly: ModuleInfo(typeof(ModlistModule), "ModioModNetworkerModule", ModioModNetworkerUpdaterVersion.versionString, "notnotnotswipez", "modiomodule", true, ConsoleColor.DarkCyan)]
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information

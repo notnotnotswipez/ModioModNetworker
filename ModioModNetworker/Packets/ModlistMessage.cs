@@ -5,6 +5,7 @@ using LabFusion.Data;
 using LabFusion.Network;
 using LabFusion.Player;
 using LabFusion.Representation;
+using LabFusion.SDK.Modules;
 using LabFusion.Utilities;
 using MelonLoader;
 using ModioModNetworker.Data;

@@ -39,18 +39,20 @@ using BoneLib.BoneMenu;
 using LabFusion.Marrow;
 using Il2CppSLZ.Marrow.Forklift;
 using LabFusion.Downloading.ModIO;
+using MelonLoader.Utils;
+using Il2CppSLZ.Bonelab;
 
 namespace ModioModNetworker
 {
     public struct ModioModNetworkerUpdaterVersion
     {
-        public const string versionString = "2.3.0";
+        public const string versionString = "2.4.0";
     }
     
     public class MainClass : MelonMod
     {
 
-        private static string MODIO_MODNETWORKER_DIRECTORY = MelonUtils.GameDirectory + "/ModIoModNetworker";
+        private static string MODIO_MODNETWORKER_DIRECTORY = MelonEnvironment.GameRootDirectory + "/ModIoModNetworker";
         private static string MODIO_AUTH_TXT_DIRECTORY = MODIO_MODNETWORKER_DIRECTORY+"/auth.txt";
         private static string MODIO_BLACKLIST_TXT_DIRECTORY = MODIO_MODNETWORKER_DIRECTORY+"/blacklist.txt";
 
@@ -66,6 +68,7 @@ namespace ModioModNetworker
         public static bool warehouseReloadRequested = false;
         public static List<string> warehousePalletReloadTargets = new List<string>();
         public static List<string> warehouseReloadFolders = new List<string>();
+        public static bool assetWarehouseLoaded = false;
 
         public static bool subsChanged = false;
         public static bool refreshInstalledModsRequested = false;
@@ -115,13 +118,11 @@ namespace ModioModNetworker
 
         public override void OnInitializeMelon()
         {
-            
+
 
             melonPreferencesCategory = MelonPreferences.CreateCategory("ModioModNetworker");
-            melonPreferencesCategory.SetFilePath(MelonUtils.UserDataDirectory+"/ModioModNetworker.cfg");
-            modsDirectory =
-                melonPreferencesCategory.CreateEntry<string>("ModDirectoryPath",
-                    Application.persistentDataPath + "/Mods");
+            melonPreferencesCategory.SetFilePath(MelonEnvironment.UserDataDirectory + "/ModioModNetworker.cfg");
+            modsDirectory = melonPreferencesCategory.CreateEntry<string>("ModDirectoryPath", Application.persistentDataPath + "/Mods");
             autoDownloadAvatarsConfig = melonPreferencesCategory.CreateEntry<bool>("AutoDownloadAvatars", true);
             autoDownloadSpawnablesConfig = melonPreferencesCategory.CreateEntry<bool>("AutoDownloadSpawnables", true);
             autoDownloadLevelsConfig = melonPreferencesCategory.CreateEntry<bool>("AutoDownloadLevels", true);
@@ -130,7 +131,7 @@ namespace ModioModNetworker
             maxAutoDownloadMbConfig = melonPreferencesCategory.CreateEntry<float>("MaxAutoDownloadMb", 500f);
             downloadMatureContentConfig = melonPreferencesCategory.CreateEntry<bool>("DownloadMatureContent", false);
             overrideFusionDLConfig = melonPreferencesCategory.CreateEntry<bool>("OverrideFusionDL", true);
-            
+
             maxAutoDownloadMb = maxAutoDownloadMbConfig.Value;
             autoDownloadAvatars = autoDownloadAvatarsConfig.Value;
             downloadMatureContent = downloadMatureContentConfig.Value;
@@ -140,11 +141,11 @@ namespace ModioModNetworker
             levelMaxGb = maxLevelAutoDownloadGbConfig.Value;
             useRepo = false;
             overrideFusionDL = overrideFusionDLConfig.Value;
-            
+
             ModFileManager.MOD_FOLDER_PATH = modsDirectory.Value;
 
             SpotlightOverride.LoadFromRegularURL();
-            
+
 
             AssetBundle uiAssets;
             if (!HelperMethods.IsAndroid())
@@ -155,20 +156,21 @@ namespace ModioModNetworker
             {
                 uiAssets = EmbeddedAssetBundle.LoadFromAssembly(Assembly.GetExecutingAssembly(), "ModioModNetworker.Resources.networkermenu.android.networker");
             }
-            
+
             NetworkerAssets.LoadAssetsUI(uiAssets);
 
             PrepareModFiles();
             string auth = ReadAuthKey();
             blacklistedModIoIds = ReadBlacklist();
-            MelonLogger.Msg("Loaded blacklist with "+blacklistedModIoIds.Count+" entries.");
-           
+            MelonLogger.Msg("Loaded blacklist with " + blacklistedModIoIds.Count + " entries.");
+
 
 
             ModIOSettings.LoadToken(OnLoadToken);
 
-                
-            void OnLoadToken(string loadedToken) {
+
+            void OnLoadToken(string loadedToken)
+            {
 
                 ModFileManager.OAUTH_KEY = loadedToken;
 
@@ -182,28 +184,25 @@ namespace ModioModNetworker
                 ModFileManager.QueueTrending(0);
                 MelonLogger.Msg("Registered on mod.io with auth key!");
             }
-            
-            
 
-            MelonLogger.Msg("Loading internal module...");
-            ModuleHandler.LoadModule(Assembly.GetExecutingAssembly());
+
+
+            /*MelonLogger.Msg("Loading internal module...");
+            ModuleHandler.LoadModule(Assembly.GetExecutingAssembly());*/
             ModFileManager.Initialize();
             ModlistMenu.Initialize();
             MultiplayerHooking.OnPlayerJoin += OnPlayerJoin;
             MultiplayerHooking.OnDisconnect += OnDisconnect;
             MultiplayerHooking.OnStartServer += OnStartServer;
             NetworkPlayer.OnNetworkRigCreated += OnPlayerRepCreated;
-            MultiplayerHooking.OnLobbyCategoryCreated += OnLobbyCategoryMade;
+            //MultiplayerHooking.OnLobbyCategoryMade += OnLobbyCategoryMade;
 
             ModFileManager.QueueTrending(0);
             ModFileManager.QueueTrending(0);
-            
-            
- 
 
-        private void OnLobbyCategoryMade(Page category, INetworkLobby lobby)
-
-        private void OnLobbyCategoryMade(Page category, INetworkLobby lobby)
+        }
+           
+        private void OnLobbyCategoryMade(BoneLib.BoneMenu.Page category, INetworkLobby lobby)
         {
             if (lobby.TryGetMetadata("modionetworker", out var value))
             {
@@ -251,12 +250,11 @@ namespace ModioModNetworker
                             {
                                 FusionNotifier.Send(new FusionNotification()
                                 {
-                                    title = new NotificationText("Installing lobby level...", Color.cyan, true),
-                                    showTitleOnPopup = true,
-                                    popupLength = 1f,
-                                    message = "Please wait",
-                                    isMenuItem = false,
-                                    isPopup = true,
+                                    Title = new NotificationText("Installing lobby level...", Color.cyan, true),
+                                    ShowPopup = true,
+                                    PopupLength = 1f,
+                                    Message = "Please wait",
+                                    Type = NotificationType.INFORMATION,
                                 });
 
                                 // Native install because it was of our own volition
@@ -265,12 +263,10 @@ namespace ModioModNetworker
                             else {
                                 FusionNotifier.Send(new FusionNotification()
                                 {
-                                    title = new NotificationText("Cannot install this map!", Color.cyan, true),
-                                    showTitleOnPopup = true,
-                                    popupLength = 1f,
-                                    message = "Probably not a networked map!",
-                                    isMenuItem = false,
-                                    isPopup = true,
+                                    Title = new NotificationText("Cannot install this map!", Color.cyan, true),
+                                    ShowPopup = true,
+                                    PopupLength = 1f,
+                                    Message = "Probably not a networked map!",
                                 });
                             }
                         }
@@ -372,11 +368,10 @@ namespace ModioModNetworker
                     handlingSubscribed = false;
                     FusionNotifier.Send(new FusionNotification()
                     {
-                        title = new NotificationText("Mod.io Subscriptions Refreshed!", Color.cyan, true),
-                        showTitleOnPopup = true,
-                        popupLength = 1f,
-                        isMenuItem = false,
-                        isPopup = true,
+                        Title = new NotificationText("Mod.io Subscriptions Refreshed!", Color.cyan, true),
+                        ShowPopup = true,
+                        PopupLength = 1f,
+                        Type = NotificationType.INFORMATION,
                     });
                     MelonLogger.Msg("Finished refreshing mod.io subscriptions!");
                     
@@ -439,12 +434,11 @@ namespace ModioModNetworker
                     {
                         FusionNotifier.Send(new FusionNotification()
                         {
-                            title = new NotificationText($"{ModlistMenu.activeDownloadModInfo.modId} {reference}", Color.cyan, true),
-                            showTitleOnPopup = true,
-                            message = new NotificationText(subtitle),
-                            popupLength = 3f,
-                            isMenuItem = false,
-                            isPopup = true,
+                            Title = new NotificationText($"{ModlistMenu.activeDownloadModInfo.modId} {reference}", Color.cyan, true),
+                            ShowPopup = true,
+                            Message = new NotificationText(subtitle),
+                            PopupLength = 3f,
+                            Type = NotificationType.INFORMATION,
                         });
                     }
 

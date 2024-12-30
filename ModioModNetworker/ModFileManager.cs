@@ -55,7 +55,7 @@ namespace ModioModNetworker
         public static UnityWebRequest activeDownloadWebRequest;
 
         public static string targetVersionString = "1.1";
-
+        
         //private static WebClient _client;
 
         public static void Initialize()

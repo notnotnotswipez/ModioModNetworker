@@ -70,7 +70,7 @@ namespace ModioModNetworker.Data
                     }
                     else
                     {
-                        ModFileManager.DownloadFile(androidDownloadLink, Path.Combine(Application.persistentDataPath, "temp.zip"));
+                        ModFileManager.DownloadFile(androidDownloadLink, Il2CppSystem.IO.Path.Combine(Application.persistentDataPath, "temp.zip"));
                     }
 
                     return true;
