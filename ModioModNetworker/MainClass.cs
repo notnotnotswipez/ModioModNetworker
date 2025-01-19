@@ -639,104 +639,135 @@ namespace ModioModNetworker
         }
 
         private static void InternalPopulateTrending() {
-            string json = trendingThreadString;
-            trendingThreadString = "";
-            var trending = JsonConvert.DeserializeObject<dynamic>(json);
+            try {
+                if (string.IsNullOrEmpty(trendingThreadString)) {
+                    return;
+                }
+
+                string json = trendingThreadString;
+                trendingThreadString = "";
+
+                var trending = JsonConvert.DeserializeObject<dynamic>(json);
+                if (trending == null || trending.data == null) {
+                    MelonLogger.Warning("Received invalid trending data format");
+                    return;
+                }
             
-            foreach (var modEntry in trending["data"])
-            {
-                
-                string modUrl = (string) modEntry["profile_url"];
-                string numericalId = "" + modEntry["id"];
-                string modTitle = (string) modEntry["name"];
-                string summary = (string) modEntry["summary"];
-                string thumbnailLink = (string) modEntry["logo"]["thumb_640x360"];
-                string[] split = modUrl.Split('/');
-                string name = split[split.Length - 1];
-                bool valid = true;
-                int windowsId = 0;
-                int androidId = 0;
-                try
+                foreach (var modEntry in trending["data"])
                 {
-                    
-                    foreach (var platform in modEntry["platforms"])
-                    {
-                        if (((string)platform["platform"]) == "windows")
-                        {
-                            int desired = (int)platform["modfile_live"];
-                            windowsId = desired;
-                            break;
-                        }
-                    }
+                    try {
+                        if (modEntry == null) continue;
 
-                    foreach (var platform in modEntry["platforms"])
-                    {
-                        if (((string)platform["platform"]) == "android")
-                        {
-                            int desired = (int)platform["modfile_live"];
-                            androidId = desired;
-                            break;
+                        string modUrl = (string)modEntry["profile_url"] ?? "";
+                        string numericalId = modEntry["id"]?.ToString() ?? "";
+                        string modTitle = (string)modEntry["name"] ?? "Unknown";
+                        string summary = (string)modEntry["summary"] ?? "";
+                        string thumbnailLink = "";
+                        
+                        if (modEntry["logo"] != null && modEntry["logo"]["thumb_640x360"] != null) {
+                            thumbnailLink = (string)modEntry["logo"]["thumb_640x360"];
                         }
-                    }
 
-                    // Same file for both platforms
-                    if (windowsId != 0)
-                    {
-                        if (androidId != 0)
-                        {
-                            if (windowsId == androidId)
+                        string[] split = modUrl.Split('/');
+                        string name = split.Length > 0 ? split[split.Length - 1] : "";
+                        bool valid = true;
+                        int windowsId = 0;
+                        int androidId = 0;
+
+                        if (modEntry["platforms"] != null) {
+                            foreach (var platform in modEntry["platforms"])
                             {
-                                valid = false;
+                                if (platform == null) continue;
+
+                                string platformType = (string)platform["platform"];
+                                if (platformType == "windows")
+                                {
+                                    windowsId = (int)platform["modfile_live"];
+                                    break;
+                                }
+                            }
+
+                            foreach (var platform in modEntry["platforms"])
+                            {
+                                if (platform == null) continue;
+
+                                string platformType = (string)platform["platform"];
+                                if (platformType == "android")
+                                {
+                                    androidId = (int)platform["modfile_live"];
+                                    break;
+                                }
                             }
                         }
-                    }
 
-                    if (((int)modEntry["status"]) == 3)
+                        // Same file for both platforms
+                        if (windowsId != 0 && androidId != 0 && windowsId == androidId)
+                        {
+                            valid = false;
+                        }
+
+                        if (modEntry["status"] != null && (int)modEntry["status"] == 3)
+                        {
+                            valid = false;
+                        }
+
+                        ModInfo modInfo = null;
+                        if (modEntry["modfile"] != null) {
+                            modInfo = ModInfo.MakeFromDynamic(modEntry["modfile"], name);
+                        } else {
+                            modInfo = new ModInfo();
+                        }
+
+                        if (modInfo == null) continue;
+
+                        modInfo.isValidMod = false;
+                        modInfo.mature = modEntry["maturity_option"] != null && ((int)modEntry["maturity_option"]) > 0;
+                        modInfo.modName = modTitle;
+                        modInfo.thumbnailLink = thumbnailLink;
+                        modInfo.modSummary = summary;
+                        modInfo.numericalId = numericalId;
+
+                        if (modEntry["tags"] != null) {
+                            foreach (var tag in modEntry["tags"])
+                            {
+                                if (tag != null && tag["name"] != null) {
+                                    modInfo.tags.Add((string)tag["name"]);
+                                }
+                            }
+                        }
+
+                        if (valid)
+                        {
+                            modInfo.androidDownloadLink =
+                                $"https://api.mod.io/v1/games/3809/mods/{(string)modEntry["id"]}/files/{androidId}/download";
+
+                            modInfo.windowsDownloadLink =
+                                $"https://api.mod.io/v1/games/3809/mods/{(string)modEntry["id"]}/files/{windowsId}/download";
+
+                            modInfo.isValidMod = true;
+                        }
+
+                        if (modInfo.version == null)
+                        {
+                            modInfo.version = "0.0.0";
+                        }
+
+                        if (modInfo.mature && !downloadMatureContent)
+                        {
+                            continue;
+                        }
+
+                        NetworkerMenuController.modIoRetrieved.Add(modInfo);
+                    }
+                    catch (Exception e)
                     {
-                        valid = false;
+                        MelonLogger.Warning($"Failed to parse trending mod entry: {e.Message}");
+                        continue;
                     }
-
-                    ModInfo modInfo = ModInfo.MakeFromDynamic((dynamic)modEntry["modfile"], name);
-                    modInfo.isValidMod = false;
-                    modInfo.mature = ((int)modEntry["maturity_option"]) > 0;
-                    modInfo.modName = modTitle;
-                    modInfo.thumbnailLink = thumbnailLink;
-                    modInfo.modSummary = summary;
-                    modInfo.numericalId = numericalId;
-
-                    foreach (var tag in modEntry["tags"])
-                    {
-                        modInfo.tags.Add((string) tag["name"]);
-                    }
-
-
-                    if (valid)
-                    {
-                        modInfo.androidDownloadLink =
-                            $"https://api.mod.io/v1/games/3809/mods/{(string)modEntry["id"]}/files/{androidId}/download";
-
-                        modInfo.windowsDownloadLink =
-                            $"https://api.mod.io/v1/games/3809/mods/{(string)modEntry["id"]}/files/{windowsId}/download";
-
-                        modInfo.isValidMod = true;
-                    }
-
-                    if (modInfo.version == null)
-                    {
-                        modInfo.version = "0.0.0";
-                    }
-
-                    if (modInfo.mature && !downloadMatureContent)
-                    {
-                        return;
-                    }
-
-                    NetworkerMenuController.modIoRetrieved.Add(modInfo);
                 }
-                catch (Exception e)
-                {
-                    MelonLogger.Error($"Failed to parse trending mod {modTitle}: "+e);
-                }
+            }
+            catch (Exception e) {
+                MelonLogger.Error($"Error in InternalPopulateTrending: {e}");
             }
         }
 

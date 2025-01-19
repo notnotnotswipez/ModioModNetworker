@@ -15,7 +15,8 @@ namespace ModioModNetworker.Patches
 {
     public class LevelLoadPatch
     {
-        [HarmonyPatch(typeof(SceneLoadMessage), "HandleMessage", typeof(byte[]), typeof(bool))]
+        [HarmonyPatch(typeof(SceneLoadMessage), "HandleMessage")]
+        [HarmonyPatch(new Type[] { typeof(byte[]), typeof(bool) })]
         public static class PatchClass
         {
             public static bool Prefix(byte[] bytes, bool isServerHandled = false)
@@ -43,7 +44,6 @@ namespace ModioModNetworker.Patches
                                 return false;
                             }
                         }
-
                     }
                 }
 
@@ -51,9 +51,9 @@ namespace ModioModNetworker.Patches
             }
         }
         
-        [HarmonyPatch(typeof(LoadSender), "SendLevelLoad", typeof(string), typeof(ulong))]
+        [HarmonyPatch(typeof(LoadSender))]
+        [HarmonyPatch("SendLevelLoad", new Type[] { typeof(string), typeof(ulong) })]
         private static class SendLevelPatchClass {
-            
             public static void Prefix(string barcode, ulong userId)
             {
                 if (!NetworkInfo.IsServer)
@@ -77,9 +77,9 @@ namespace ModioModNetworker.Patches
             }
         }
         
-        [HarmonyPatch(typeof(LoadSender), "SendLevelLoad", typeof(string))]
+        [HarmonyPatch(typeof(LoadSender))]
+        [HarmonyPatch("SendLevelLoad", new Type[] { typeof(string) })]
         private static class SendLevelPatchClassGeneric {
-            
             public static void Prefix(string barcode)
             {
                 if (!NetworkInfo.IsServer)
