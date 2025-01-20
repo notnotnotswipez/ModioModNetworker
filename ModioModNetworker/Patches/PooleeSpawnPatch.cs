@@ -21,18 +21,26 @@ namespace ModioModNetworker.Patches
             {
                 if (MainClass.confirmedHostHasIt && NetworkInfo.HasServer)
                 {
-                    ModInfo installedModInfo = ModInfoUtilities.GetModInfoForPoolee(__instance);
-                    if (installedModInfo != null)
+                    try
                     {
-                        using (var writer = FusionWriter.Create()) {
-                            using (var data = ModlistData.Create(PlayerIdManager.LocalId, installedModInfo, ModlistData.ModType.SPAWNABLE)) {
-                                writer.Write(data);
-                                using (var message = FusionMessage.ModuleCreate<ModlistMessage>(writer))
+                        ModInfo installedModInfo = ModInfoUtilities.GetModInfoForPoolee(__instance);
+                        if (installedModInfo != null)
+                        {
+                            using (var writer = FusionWriter.Create())
+                            {
+                                using (var data = ModlistData.Create(PlayerIdManager.LocalId, installedModInfo, ModlistData.ModType.SPAWNABLE))
                                 {
-                                    MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
+                                    writer.Write(data);
+                                    using (var message = FusionMessage.ModuleCreate<ModlistMessage>(writer))
+                                    {
+                                        MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
+                                    }
                                 }
                             }
                         }
+                    }
+                    catch (Exception e) {
+                        // Ignore
                     }
                 }
             }
