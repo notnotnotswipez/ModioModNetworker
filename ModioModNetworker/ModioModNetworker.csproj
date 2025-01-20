@@ -70,7 +70,7 @@
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\net6\MelonLoader.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\Managed\Newtonsoft.Json.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\net6\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="Unity.Addressables">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\Il2CppAssemblies\Unity.Addressables.dll</HintPath>

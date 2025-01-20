@@ -314,7 +314,6 @@ namespace ModIoModNetworker.Ui
             else {
                 if (viewedInfo.windowsDownloadLink != "nothing" || viewedInfo.androidDownloadLink != "nothing")
                 {
-                    MelonLogger.Msg("Receive sub mod info called");
                     MainClass.ReceiveSubModInfo(viewedInfo);
                 }
                 else
@@ -797,11 +796,8 @@ namespace ModIoModNetworker.Ui
                     }));
                 }*/
 
-                MelonLogger.Msg("Downloading thumbnail for spotlight!");
-
                 ThumbnailThreader.DownloadThumbnail(targetInfo.thumbnailLink, (texture =>
                 {
-                    MelonLogger.Msg("Downloaded thumbnail for spotlight!");
                     if (thumbNail)
                     {
                         thumbNail.texture = texture;
@@ -853,8 +849,7 @@ namespace ModIoModNetworker.Ui
 
                 if (modInfoDisplay)
                 {
-                    // Manual texture removing nonsense
-                    DestroyImmediate(modInfoDisplay.thumbnailImage.texture);
+                    modInfoDisplay.DestroyThumbnail();
                 }
                 Destroy(child.gameObject);
             }
@@ -890,7 +885,7 @@ namespace ModIoModNetworker.Ui
                 if (modInfoDisplay)
                 {
                     // Manual texture removing nonsense
-                    DestroyImmediate(modInfoDisplay.thumbnailImage.texture);
+                    modInfoDisplay.DestroyThumbnail();
                 }
                 Destroy(child.gameObject);
             }
@@ -937,7 +932,7 @@ namespace ModIoModNetworker.Ui
                 ModInfoDisplay modInfoDisplay = child.GetComponentInChildren<ModInfoDisplay>();
                 if (modInfoDisplay) {
                     // Manual texture removing nonsense
-                    DestroyImmediate(modInfoDisplay.thumbnailImage.texture);
+                    modInfoDisplay.DestroyThumbnail();
                 }
 
                 Destroy(child.gameObject);
@@ -1000,7 +995,6 @@ namespace ModIoModNetworker.Ui
                 case Panels.FILES:
                     SetSelectorDesired(filesTabButton.transform.parent.Find("SelectorDesiredPos"));
                     SetFilterMode(chosenSort);
-                    MainClass.refreshInstalledModsRequested = true;
                     break;
                 case Panels.MODIO:
                     maxPages = (int) Math.Ceiling((double) modIoRetrieved.Count / (double) maxDisplayPerPage);

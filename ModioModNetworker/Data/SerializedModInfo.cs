@@ -2,6 +2,7 @@ using LabFusion.Data;
 using LabFusion.Extensions;
 using LabFusion.Network;
 using LabFusion.Utilities;
+using MelonLoader;
 
 namespace ModioModNetworker.Data
 {
@@ -102,7 +103,27 @@ namespace ModioModNetworker.Data
             foreach (var tag in tags) {
                 built += StringExtensions.UniqueSeparator + tag;
             }
+
             writer.Write(built);
+        }
+
+        public string ToDebugString() {
+            string built = "";
+            built += versionNumber + StringExtensions.UniqueSeparator;
+            built += windowsDownloadLink + StringExtensions.UniqueSeparator;
+            built += androidDownloadLink + StringExtensions.UniqueSeparator;
+            built += modId + StringExtensions.UniqueSeparator;
+            built += thumbnailUrl + StringExtensions.UniqueSeparator;
+            built += summary + StringExtensions.UniqueSeparator;
+            built += modName + StringExtensions.UniqueSeparator;
+            built += tags.Count;
+
+            foreach (var tag in tags)
+            {
+                built += StringExtensions.UniqueSeparator + tag;
+            }
+
+            return $"Serialized mod: {built} is valid {valid}, mature {mature}, numerical {numericalId}";
         }
     }
 }

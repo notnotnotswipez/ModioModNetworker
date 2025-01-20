@@ -21,12 +21,14 @@ namespace ModIoModNetworker.Ui
         }
 
         public TMP_Text title;
-        public RawImage thumbnailImage;
+        private RawImage thumbnailImage;
         public RawImage borderImage;
         public ModInfo modInfo;
         public Button button;
         public NetworkerMenuController controller;
         public GameObject subscriptionButton;
+
+        private bool hasAddedThumbnail = false;
 
 
         public void Awake() {
@@ -60,8 +62,15 @@ namespace ModIoModNetworker.Ui
             {
                 if (thumbnailImage) {
                     thumbnailImage.texture = texture;
+                    hasAddedThumbnail = true;
                 }
             }));
+        }
+
+        public void DestroyThumbnail() {
+            if (hasAddedThumbnail) {
+                DestroyImmediate(thumbnailImage.texture);
+            }
         }
     }
 }

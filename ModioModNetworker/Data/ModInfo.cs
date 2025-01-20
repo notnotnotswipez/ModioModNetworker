@@ -70,7 +70,7 @@ namespace ModioModNetworker.Data
                     }
                     else
                     {
-                        ModFileManager.DownloadFile(androidDownloadLink, Path.Combine(Application.persistentDataPath, "temp.zip"));
+                        ModFileManager.DownloadFile(androidDownloadLink, System.IO.Path.Combine(Application.persistentDataPath, "temp.zip"));
                     }
 
                     return true;
@@ -168,19 +168,30 @@ namespace ModioModNetworker.Data
 
             modListing.Targets.Add("android", androidTarget);
 
-            string infoString = $"networker;{mature};{temp};{fileSizeKB};{fileName};{structureVersion};{modName};{tags.Count}";
-            foreach (var tag in tags) {
-                infoString += ";" + tag;
-            }
+            string infoString = ToInfoString();
+            
             modListing.Targets.Add(infoString, modTarget);
 
             return modListing;
 
         }
 
+        public string ToInfoString() {
+            string infoString = $"networker;{mature};{temp};{fileSizeKB};{fileName};{structureVersion};{ToSafeString(modName)};{tags.Count}";
+            foreach (var tag in tags)
+            {
+                infoString += ";" + tag;
+            }
+            return infoString;
+        }
+
+        public string ToSafeString(string initial) {
+            return initial.Replace("&amp;", "&").Replace(";", "|");
+        }
+
         public void PopulateFromInfoString(string targetString)
         {
-            string[] split = targetString.Split(";");
+            string[] split = ToSafeString(targetString).Split(";");
             mature = bool.Parse(split[1]);
             temp = bool.Parse(split[2]);
             fileSizeKB = float.Parse(split[3]);

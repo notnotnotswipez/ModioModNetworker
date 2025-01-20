@@ -34,7 +34,6 @@ namespace ModioModNetworker.UI
                 foreach (string line in lines)
                 {
                     if (line.StartsWith("manualDisplayMod: ")) {
-                        MelonLogger.Msg("READ MANUAL DISPLAY ID");
                         NetworkerMenuController.spotlightOverride.manualDisplayId = GetSegmentOrNull(line, "manualDisplayMod: ");
 
                         if (NetworkerMenuController.spotlightOverride.manualDisplayId != null) {
@@ -54,8 +53,6 @@ namespace ModioModNetworker.UI
                     {
                         NetworkerMenuController.spotlightOverride.descriptionOverride = GetSegmentOrNull(line, "descriptionOverride: ");
                     }
-
-                    MelonLogger.Msg("Read line from online: " + line);
                 }
             });
         }

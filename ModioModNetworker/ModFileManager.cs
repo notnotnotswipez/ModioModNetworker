@@ -54,7 +54,7 @@ namespace ModioModNetworker
         public static DownloadQueueElement activeDownloadQueueElement = null;
         public static UnityWebRequest activeDownloadWebRequest;
 
-        public static string targetVersionString = "1.1";
+        public static string[] targetVersionStrings = { "1.1" , "1.2"};
 
         //private static WebClient _client;
 
@@ -178,7 +178,6 @@ namespace ModioModNetworker
         {
             ModInfo modInfo = queueElement.info;
 
-            MelonLogger.Msg("Added to queue: "+modInfo.modName+" with tag count: "+modInfo.tags.Count);
             // Check if mod is in installed mods
             if (!modInfo.isValidMod)
             {
@@ -197,9 +196,13 @@ namespace ModioModNetworker
             }
 
             if (!ignoreTag) {
-                // TODO: Change this to be dynamic in some way?
-                if (!modInfo.tags.Contains(targetVersionString))
-                {
+                bool contains = false;
+                foreach (var tag in modInfo.tags) {
+                    if (targetVersionStrings.Contains(tag)) {
+                        contains = true;
+                    }
+                }
+                if (!contains) {
                     return false;
                 }
             }
@@ -252,11 +255,10 @@ namespace ModioModNetworker
                 }
             }
 
-            MelonLogger.Msg("Added: " + modInfo.modId + " to install queue");
             queue.Add(queueElement);
             return true;
         }
-        
+
         /*public static void DownloadFileUnityWeb(string url, string path)
         {
             UnityWebRequest request = UnityWebRequest.Get(url);
@@ -273,9 +275,48 @@ namespace ModioModNetworker
             });
         }*/
 
+        public static async void DownloadFileHttpClient(string url, string path)
+        {
+            var handler = new HttpClientHandler();
+            handler.ClientCertificateOptions = ClientCertificateOption.Manual;
+            handler.ServerCertificateCustomValidationCallback =
+                (httpRequestMessage, cert, cetChain, policyErrors) =>
+                {
+                    return true;
+                };
+
+            using (HttpClient client = new HttpClient(handler))
+            {
+                client.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
+
+                using (HttpResponseMessage response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
+                using (Stream streamToReadFrom = await response.Content.ReadAsStreamAsync())
+                {
+                    long totalBytes = response.Content.Headers.ContentLength.Value;
+                    long bytesRead = 0;
+                    byte[] buffer = new byte[4096];
+                    int bytesReceived;
+
+                    using (FileStream fs = new FileStream(path, FileMode.CreateNew))
+                    {
+                        while ((bytesReceived = await streamToReadFrom.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                        {
+                            await fs.WriteAsync(buffer, 0, bytesReceived);
+                            bytesRead += bytesReceived;
+
+                            double percentage = (double) bytesRead / totalBytes * 100;
+                            OnDownloadProgressChanged(percentage);
+                        }
+                    }
+                }
+
+                OnDownloadFileCompleted();
+            }
+        }
+
         public static async Task DownloadFileAsync(string url, string path)
         {
-            HttpWebRequest request = (HttpWebRequest) WebRequest.Create(url);
+            /*HttpWebRequest request = (HttpWebRequest) WebRequest.Create(url);
             request.Method = "GET";
             request.ContentType = "application/octet-stream";
             request.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
@@ -310,7 +351,8 @@ namespace ModioModNetworker
             else
             {
                 MelonLogger.Error("Failed to download file");
-            }
+            }*/
+            DownloadFileHttpClient(url, path);
         }
 
         public static void DownloadFile(string url, string path)
@@ -598,8 +640,6 @@ namespace ModioModNetworker
 
                     File.Delete(installedModInfo.manifestPath);
                     // Delete mod folder
-                    MelonLogger.Msg("Catalog path: " + installedModInfo.catalogPath);
-                    MelonLogger.Msg("Catalog parent: " + Directory.GetParent(installedModInfo.catalogPath).FullName);
                     string parentDirectory = Directory.GetParent(installedModInfo.catalogPath).FullName;
 
                     
@@ -613,7 +653,7 @@ namespace ModioModNetworker
             }
 
 
-            MainClass.refreshInstalledModsRequested = true;
+            MainClass.RequestInstallCheck();
         }
 
         private static void UnloadPallet(string palletBarcode)
@@ -691,7 +731,6 @@ namespace ModioModNetworker
                         // Delete mod folder
                         File.Delete(installedModInfo.manifestPath);
                         // Delete mod folder
-                        MelonLogger.Msg("Catalog path: " + installedModInfo.catalogPath);
                         string parentDirectory = Directory.GetParent(installedModInfo.catalogPath).FullName;
                         Directory.Delete(parentDirectory, true);
 
@@ -701,9 +740,9 @@ namespace ModioModNetworker
                 {
                     MelonLogger.Error("Exception when uninstalling mod: " + ex);
                 }
-                
 
-                MainClass.refreshInstalledModsRequested = true;
+
+                MainClass.RequestInstallCheck();
             });
 
             thread.Start();
@@ -924,14 +963,18 @@ public class DownloadAction
                         MelonLogger.Msg("Directory exists: " + modFolderDestination);
                         existing = true;
                         string existingPalletJson = ModFileManager.FindFile(modFolderDestination, "pallet.json");
-                        string fileContents = File.ReadAllText(existingPalletJson);
-                        var jsonData = (dynamic) JsonConvert.DeserializeObject<dynamic>(fileContents);
-                        string palletId = (string) jsonData["objects"]["1"]["barcode"];
-                        MainClass.warehousePalletReloadTargets.Add(palletId);
+                        if (existingPalletJson != "")
+                        {
+                            string fileContents = File.ReadAllText(existingPalletJson);
+                            var jsonData = (dynamic) JsonConvert.DeserializeObject<dynamic>(fileContents);
+                            string palletId = (string) jsonData["objects"]["1"]["barcode"];
+                            MainClass.warehousePalletReloadTargets.Add(palletId);
+                        }
+                        else {
+                            existing = false;
+                        }
                         Directory.Delete(modFolderDestination, true);
                     }
-
-                    MelonLogger.Msg("Mod is existing: " + existing);
                     
 
                     Directory.Move(modFolder, modFolderDestination);
@@ -958,7 +1001,7 @@ public class DownloadAction
                 Directory.Delete(exportDirectory, true);
                
                 MainClass.warehouseReloadRequested = true;
-                MainClass.refreshInstalledModsRequested = true;
+                MainClass.RequestInstallCheck();
                 MainClass.subsChanged = true;
                 //_client.Dispose();
             }

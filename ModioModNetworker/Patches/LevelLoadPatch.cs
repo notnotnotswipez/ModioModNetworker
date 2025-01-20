@@ -51,10 +51,10 @@ namespace ModioModNetworker.Patches
             }
         }
         
-        [HarmonyPatch(typeof(LoadSender), "SendLevelLoad", typeof(string), typeof(ulong))]
+        [HarmonyPatch(typeof(LoadSender), "SendLevelLoad", typeof(string), typeof(string), typeof(ulong))]
         private static class SendLevelPatchClass {
             
-            public static void Prefix(string barcode, ulong userId)
+            public static void Prefix(string barcode, string loadBarcode, ulong userId)
             {
                 if (!NetworkInfo.IsServer)
                     return;
@@ -63,8 +63,10 @@ namespace ModioModNetworker.Patches
                 if (installedModInfo != null)
                 {
                     LobbyCreatePatch.LobbyMetaDataHelperPatch.lobbyNumericalId = installedModInfo.numericalId;
-                    using (var writer = FusionWriter.Create()) {
-                        using (var data = ModlistData.Create(PlayerIdManager.LocalId, installedModInfo, ModlistData.ModType.LEVEL)) {
+                    using (var writer = FusionWriter.Create())
+                    {
+                        using (var data = ModlistData.Create(PlayerIdManager.LocalId, installedModInfo, ModlistData.ModType.LEVEL))
+                        {
                             writer.Write(data);
                             using (var message = FusionMessage.ModuleCreate<ModlistMessage>(writer))
                             {
@@ -73,14 +75,16 @@ namespace ModioModNetworker.Patches
                         }
                     }
                 }
-                LobbyCreatePatch.LobbyMetaDataHelperPatch.lobbyNumericalId = "null";
+                else {
+                    LobbyCreatePatch.LobbyMetaDataHelperPatch.lobbyNumericalId = "null";
+                }
             }
         }
         
-        [HarmonyPatch(typeof(LoadSender), "SendLevelLoad", typeof(string))]
+        [HarmonyPatch(typeof(LoadSender), "SendLevelLoad", typeof(string), typeof(string))]
         private static class SendLevelPatchClassGeneric {
             
-            public static void Prefix(string barcode)
+            public static void Prefix(string barcode, string loadBarcode)
             {
                 if (!NetworkInfo.IsServer)
                     return;

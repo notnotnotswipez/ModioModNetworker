@@ -2,6 +2,7 @@ using ModioModNetworker.Data;
 using Il2CppSLZ.Marrow.Pool;
 using Il2CppSLZ.Marrow.Warehouse;
 using LabFusion.Marrow;
+using MelonLoader;
 
 namespace ModioModNetworker.Utilities
 {
@@ -44,13 +45,23 @@ namespace ModioModNetworker.Utilities
             ModInfo foundModInfo = null;
             foreach (var installedModInfo in MainClass.InstalledModInfos)
             {
-                if (installedModInfo.palletBarcode == barcode)
-                {
-                    foundModInfo = installedModInfo.ModInfo;
-                    break;
+                try {
+                    if (installedModInfo.palletBarcode == barcode)
+                    {
+                        foundModInfo = installedModInfo.ModInfo;
+                        break;
+                    }
+                }
+                catch (Exception ex) {
+                    continue;
                 }
             }
-            return foundModInfo;
+
+            if (foundModInfo != null) {
+                return foundModInfo;
+            }
+
+            return null;
         }
     }
 }

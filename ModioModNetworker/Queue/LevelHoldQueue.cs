@@ -36,12 +36,11 @@ namespace ModioModNetworker.Queue
         {
             FusionNotifier.Send(new FusionNotification()
             {
-                title = new NotificationText($"The host tried loading a level you dont have. \"{data.missingBarcode}\""),
-                message = new NotificationText("Wait a bit, it may start downloading!"),
-                showTitleOnPopup = true,
-                popupLength = 3f,
-                isMenuItem = false,
-                isPopup = true,
+                Title = new NotificationText($"The host tried loading a level you dont have. \"{data.missingBarcode}\""),
+                Message = new NotificationText("Wait a bit, it may start downloading!"),
+                PopupLength = 3f,
+                SaveToMenu = false,
+                ShowPopup = true,
             });
 
             queueData = data;
@@ -105,7 +104,7 @@ namespace ModioModNetworker.Queue
 
         private static void Handle(SceneLoadData data)
         {
-            FusionSceneManager.SetTargetScene(data.levelBarcode);
+            FusionSceneManager.SetTargetScene(data.levelBarcode, data.loadBarcode);
         }
         
         

@@ -5,6 +5,7 @@ using LabFusion.Data;
 using LabFusion.Network;
 using LabFusion.Player;
 using LabFusion.Representation;
+using LabFusion.SDK.Modules;
 using LabFusion.Utilities;
 using MelonLoader;
 using ModioModNetworker.Data;
@@ -104,7 +105,6 @@ namespace ModioModNetworker
                         ModInfo modInfo = data.serializedModInfo.modInfo;
                         if (data.modType != ModlistData.ModType.LIST)
                         {
-                            //if (modInfo.isValidMod)
                             if (true)
                             {
                                 switch (data.modType)
