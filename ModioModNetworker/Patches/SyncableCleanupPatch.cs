@@ -1,6 +1,5 @@
 using HarmonyLib;
 using LabFusion.Entities;
-using LabFusion.Syncables;
 using ModioModNetworker.Queue;
 using ModioModNetworker.Utilities;
 

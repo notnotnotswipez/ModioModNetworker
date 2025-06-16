@@ -177,16 +177,17 @@ namespace ModioModNetworker.Data
         }
 
         public string ToInfoString() {
-            string infoString = $"networker;{mature};{temp};{fileSizeKB};{fileName};{structureVersion};{ToSafeString(modName)};{tags.Count}";
+            string infoString = $"networker;{mature};{temp};{fileSizeKB};{fileName};{structureVersion};{ToSafeString(modName).Replace(";", "")};{tags.Count}";
             foreach (var tag in tags)
             {
                 infoString += ";" + tag;
             }
+
             return infoString;
         }
 
         public string ToSafeString(string initial) {
-            return initial.Replace("&amp;", "&").Replace(";", "|");
+            return initial.Replace("&amp;", "&");
         }
 
         public void PopulateFromInfoString(string targetString)
@@ -387,7 +388,7 @@ namespace ModioModNetworker.Data
             {
                 string id = destination.Split(';')[1];
                 byte idByte = byte.Parse(id);
-                PlayerId playerId = PlayerIdManager.GetPlayerId(idByte);
+                PlayerID playerId = PlayerIDManager.GetPlayerID(idByte);
                 if (playerId != null) {
                     action = new Action<ModInfo>((info =>
                     {

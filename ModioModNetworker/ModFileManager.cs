@@ -860,7 +860,7 @@ namespace ModioModNetworker
 
 public class DownloadQueueElement
 {
-    public PlayerId associatedPlayer;
+    public PlayerID associatedPlayer;
     public ModInfo info;
     public bool notify = true;
     public bool lobby = false;

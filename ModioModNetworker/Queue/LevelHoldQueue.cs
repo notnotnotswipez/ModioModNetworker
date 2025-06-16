@@ -8,6 +8,7 @@ using Il2CppSLZ.Marrow.SceneStreaming;
 using Il2CppSLZ.Marrow.Warehouse;
 using UnityEngine;
 using LabFusion.Scene;
+using LabFusion.UI.Popups;
 
 namespace ModioModNetworker.Queue
 {
@@ -34,7 +35,7 @@ namespace ModioModNetworker.Queue
         
         public static void SetQueue(LevelHoldQueueData data)
         {
-            FusionNotifier.Send(new FusionNotification()
+            Notifier.Send(new Notification()
             {
                 Title = new NotificationText($"The host tried loading a level you dont have. \"{data.missingBarcode}\""),
                 Message = new NotificationText("Wait a bit, it may start downloading!"),
@@ -102,16 +103,16 @@ namespace ModioModNetworker.Queue
             }
         }
 
-        private static void Handle(SceneLoadData data)
+        private static void Handle(LevelLoadData data)
         {
-            FusionSceneManager.SetTargetScene(data.levelBarcode, data.loadBarcode);
+            FusionSceneManager.SetTargetScene(data.LevelBarcode, data.LoadingScreenBarcode);
         }
         
         
         public class LevelHoldQueueData
         {
             public string missingBarcode;
-            public SceneLoadData _data;
+            public LevelLoadData _data;
         }
     }
 }

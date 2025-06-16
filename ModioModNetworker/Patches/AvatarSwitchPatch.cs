@@ -8,6 +8,7 @@ using ModioModNetworker.Data;
 using Il2CppSLZ.Marrow.SceneStreaming;
 using Il2CppSLZ.Marrow.Warehouse;
 using LabFusion.Player;
+using LabFusion.Network.Serialization;
 
 namespace ModioModNetworker.Patches
 {
@@ -35,7 +36,8 @@ namespace ModioModNetworker.Patches
                         }
                     }
                     else {
-                        MelonLogger.Error("We DO NOT have any repo information on: " + palletBarcode);
+                        
+        .Error("We DO NOT have any repo information on: " + palletBarcode);
                     }
                 }
             }
@@ -49,7 +51,7 @@ namespace ModioModNetworker.Patches
             {
                 if (NetworkInfo.HasServer && MainClass.confirmedHostHasIt)
                 {
-                    ModInfo avatarModInfo = null;
+                    Data.ModInfo avatarModInfo = null;
                     foreach (var installedModInfo in MainClass.InstalledModInfos)
                     {
                         if (installedModInfo.palletBarcode == RigData.Refs.RigManager._avatarCrate.Crate._pallet._barcode._id)
@@ -59,26 +61,27 @@ namespace ModioModNetworker.Patches
                         }
                     }
 
-                    if (!ModlistMessage.avatarMods.ContainsKey(PlayerIdManager.LocalId))
+                    if (!ModlistMessage.avatarMods.ContainsKey(PlayerIDManager.LocalID))
                     {
-                        ModlistMessage.avatarMods.Add(PlayerIdManager.LocalId, avatarModInfo);
+                        ModlistMessage.avatarMods.Add(PlayerIDManager.LocalID, avatarModInfo);
                     }
                     else
                     {
-                        ModlistMessage.avatarMods[PlayerIdManager.LocalId] = avatarModInfo;
+                        ModlistMessage.avatarMods[PlayerIDManager.LocalID] = avatarModInfo;
                     }
 
 
                     if (avatarModInfo != null)
                     {
-                        using (var writer = FusionWriter.Create()) {
-                            using (var data = ModlistData.Create(PlayerIdManager.LocalId, avatarModInfo, ModlistData.ModType.AVATAR)) {
-                                writer.Write(data);
-                                using (var message = FusionMessage.ModuleCreate<ModlistMessage>(writer))
-                                {
-                                    MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
-                                }
+                        using (var writer = NetWriter.Create())
+                        {
+                            var data = ModlistData.Create(PlayerIDManager.LocalID, avatarModInfo, ModlistData.ModType.AVATAR);
+                            data.Serialize(writer);
+                            using (var message = NetMessage.ModuleCreate<ModlistMessage>(writer, CommonMessageRoutes.ReliableToClients))
+                            {
+                                MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
                             }
+
                         }
                     }
                 }

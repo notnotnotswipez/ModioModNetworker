@@ -9,6 +9,7 @@ using Il2CppSLZ.Marrow.Warehouse;
 using LabFusion.Extensions;
 using UnityEngine;
 using LabFusion.Marrow;
+using LabFusion.Marrow.Pool;
 
 namespace ModioModNetworker.Queue
 {
@@ -62,7 +63,7 @@ namespace ModioModNetworker.Queue
 
         private static void Handle(SpawnResponseData data)
         {
-            var crateRef = new SpawnableCrateReference(data.barcode);
+            var crateRef = new SpawnableCrateReference(data.Barcode);
 
             var spawnable = new Spawnable()
             {
@@ -70,14 +71,14 @@ namespace ModioModNetworker.Queue
                 policyData = null
             };
 
-            AssetSpawner.Register(spawnable);
+            LocalAssetSpawner.Register(spawnable);
 
-            byte owner = data.owner;
-            string barcode = data.barcode;
-            ushort syncId = data.entityId;
-            uint trackerId = data.trackerId;
+            byte owner = data.OwnerID;
+            string barcode = data.Barcode;
+            ushort syncId = data.EntityID;
+            uint trackerId = data.TrackerID;
 
-            SafeAssetSpawner.Spawn(spawnable, data.serializedTransform.position, data.serializedTransform.rotation, (go) => {
+            LocalAssetSpawner.Spawn(spawnable, data.SerializedTransform.position, data.SerializedTransform.rotation, (go) => {
                 SpawnResponseMessage.OnSpawnFinished(owner, barcode, syncId, go, trackerId);
             });
         }

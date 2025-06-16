@@ -13,7 +13,7 @@ namespace ModioModNetworker.Utilities
     {
         public static List<NetworkPlayer> GetAllNetworkPlayers() {
             List<NetworkPlayer> networkPlayers = new List<NetworkPlayer>();
-            foreach (var playerId in PlayerIdManager.PlayerIds)
+            foreach (var playerId in PlayerIDManager.PlayerIDs)
             {
                 if (NetworkPlayerManager.TryGetPlayer(playerId, out var player)) {
                     networkPlayers.Add(player);

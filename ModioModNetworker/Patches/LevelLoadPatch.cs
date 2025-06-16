@@ -10,69 +10,69 @@ using ModioModNetworker.Utilities;
 using Il2CppSLZ.Marrow.Warehouse;
 using LabFusion.Player;
 using LabFusion.Marrow;
+using LabFusion.Network.Serialization;
 
 namespace ModioModNetworker.Patches
 {
     public class LevelLoadPatch
     {
-        [HarmonyPatch(typeof(SceneLoadMessage), "HandleMessage", typeof(byte[]), typeof(bool))]
+        [HarmonyPatch(typeof(LevelLoadMessage), "OnHandleMessage", typeof(ReceivedMessage))]
         public static class PatchClass
         {
-            public static bool Prefix(byte[] bytes, bool isServerHandled = false)
+            public static bool Prefix(ReceivedMessage received)
             {
-                if (!NetworkInfo.IsServer && !isServerHandled && MainClass.autoDownloadLevels) {
-                    using (var reader = FusionReader.Create(bytes)) {
-                        var data = reader.ReadFusionSerializable<SceneLoadData>();
+                if (!NetworkInfo.IsHost && !received.IsServerHandled && MainClass.autoDownloadLevels)
+                {
 
-                        if (!MainClass.overrideFusionDL)
-                        {
-                            return true;
-                        }
+                    var data = received.ReadData<LevelLoadData>();
 
-                        // Clear the level queue no matter what because no matter what outcome it is, we are going to be loading a new level.
-                        LevelHoldQueue.ClearQueue();
-
-                        if (MainClass.confirmedHostHasIt || MainClass.useRepo) {
-                            if (!CrateFilterer.HasCrate<LevelCrate>(new Barcode(data.levelBarcode)))
-                            {
-                                LevelHoldQueue.SetQueue(new LevelHoldQueue.LevelHoldQueueData()
-                                {
-                                    missingBarcode = data.levelBarcode,
-                                    _data = data
-                                });
-                                return false;
-                            }
-                        }
-
+                    if (!MainClass.overrideFusionDL)
+                    {
+                        return true;
                     }
-                }
 
+                    // Clear the level queue no matter what because no matter what outcome it is, we are going to be loading a new level.
+                    LevelHoldQueue.ClearQueue();
+
+                    if (MainClass.confirmedHostHasIt || MainClass.useRepo)
+                    {
+                        if (!CrateFilterer.HasCrate<LevelCrate>(new Barcode(data.LevelBarcode)))
+                        {
+                            LevelHoldQueue.SetQueue(new LevelHoldQueue.LevelHoldQueueData()
+                            {
+                                missingBarcode = data.LevelBarcode,
+                                _data = data
+                            });
+                            return false;
+                        }
+                    }
+
+                }
                 return true;
             }
         }
         
-        [HarmonyPatch(typeof(LoadSender), "SendLevelLoad", typeof(string), typeof(string), typeof(ulong))]
+        [HarmonyPatch(typeof(LoadSender), nameof(LoadSender.SendLevelLoad), typeof(string), typeof(string), typeof(ulong))]
         private static class SendLevelPatchClass {
             
             public static void Prefix(string barcode, string loadBarcode, ulong userId)
             {
-                if (!NetworkInfo.IsServer)
+                if (!NetworkInfo.IsHost)
                     return;
                 
                 ModInfo installedModInfo = ModInfoUtilities.GetModInfoForLevelBarcode(barcode);
                 if (installedModInfo != null)
                 {
                     LobbyCreatePatch.LobbyMetaDataHelperPatch.lobbyNumericalId = installedModInfo.numericalId;
-                    using (var writer = FusionWriter.Create())
+                    using (var writer = NetWriter.Create())
                     {
-                        using (var data = ModlistData.Create(PlayerIdManager.LocalId, installedModInfo, ModlistData.ModType.LEVEL))
+                        var data = ModlistData.Create(PlayerIDManager.LocalID, installedModInfo, ModlistData.ModType.LEVEL);
+                        data.Serialize(writer);
+                        using (var message = NetMessage.ModuleCreate<ModlistMessage>(writer, CommonMessageRoutes.ReliableToClients))
                         {
-                            writer.Write(data);
-                            using (var message = FusionMessage.ModuleCreate<ModlistMessage>(writer))
-                            {
-                                MessageSender.SendFromServer(userId, NetworkChannel.Reliable, message);
-                            }
+                            MessageSender.SendFromServer(userId, NetworkChannel.Reliable, message);
                         }
+
                     }
                 }
                 else {
@@ -81,25 +81,27 @@ namespace ModioModNetworker.Patches
             }
         }
         
-        [HarmonyPatch(typeof(LoadSender), "SendLevelLoad", typeof(string), typeof(string))]
+        [HarmonyPatch(typeof(LoadSender), nameof(LoadSender.SendLevelLoad), typeof(string), typeof(string))]
         private static class SendLevelPatchClassGeneric {
-            
+
             public static void Prefix(string barcode, string loadBarcode)
             {
-                if (!NetworkInfo.IsServer)
+                if (!NetworkInfo.IsHost)
                     return;
-                
+
                 ModInfo installedModInfo = ModInfoUtilities.GetModInfoForLevelBarcode(barcode);
                 if (installedModInfo != null)
                 {
-                    using (var writer = FusionWriter.Create()) {
-                        using (var data = ModlistData.Create(PlayerIdManager.LocalId, installedModInfo, ModlistData.ModType.LEVEL)) {
-                            writer.Write(data);
-                            using (var message = FusionMessage.ModuleCreate<ModlistMessage>(writer))
-                            {
-                                MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
-                            }
+                    using (var writer = NetWriter.Create())
+                    {
+                        var data = ModlistData.Create(PlayerIDManager.LocalID, installedModInfo, ModlistData.ModType.LEVEL);
+
+                        data.Serialize(writer);
+                        using (var message = NetMessage.ModuleCreate<ModlistMessage>(writer, CommonMessageRoutes.ReliableToClients))
+                        {
+                            MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
                         }
+
                     }
                 }
             }

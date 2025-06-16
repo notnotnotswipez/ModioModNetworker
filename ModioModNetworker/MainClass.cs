@@ -40,12 +40,14 @@ using LabFusion.Marrow;
 using Il2CppSLZ.Marrow.Forklift;
 using LabFusion.Downloading.ModIO;
 using ThunderstoreModAssistant.Utilities;
+using LabFusion.Network.Serialization;
+using LabFusion.UI.Popups;
 
 namespace ModioModNetworker
 {
     public struct ModioModNetworkerUpdaterVersion
     {
-        public const string versionString = "2.5.0";
+        public const string versionString = "2.6.0";
     }
     
     public class MainClass : MelonMod
@@ -58,8 +60,8 @@ namespace ModioModNetworker
         public static List<string> subscribedModIoNumericalIds = new List<string>();
         public static List<string> blacklistedModIoIds = new List<string>();
         private static List<string> toRemoveSubscribedModIoIds = new List<string>();
-        public static List<ModInfo> subscribedMods = new List<ModInfo>();
-        public static List<ModInfo> installedMods = new List<ModInfo>();
+        public static List<Data.ModInfo> subscribedMods = new List<Data.ModInfo>();
+        public static List<Data.ModInfo> installedMods = new List<Data.ModInfo>();
         public static List<InstalledModInfo> InstalledModInfos = new List<InstalledModInfo>();
 
         private static List<InstalledModInfo> outOfDateModInfos = new List<InstalledModInfo>();
@@ -192,9 +194,9 @@ namespace ModioModNetworker
             ModuleManager.RegisterModule<ModlistModule>();
             ModFileManager.Initialize();
             ModlistMenu.Initialize();
-            MultiplayerHooking.OnPlayerJoin += OnPlayerJoin;
-            MultiplayerHooking.OnDisconnect += OnDisconnect;
-            MultiplayerHooking.OnStartServer += OnStartServer;
+            MultiplayerHooking.OnPlayerJoined += OnPlayerJoin;
+            MultiplayerHooking.OnDisconnected += OnDisconnect;
+            MultiplayerHooking.OnStartedServer += OnStartServer;
             NetworkPlayer.OnNetworkRigCreated += OnPlayerRepCreated;
         }
 
@@ -244,7 +246,7 @@ namespace ModioModNetworker
 
                             if (mapNumber != "null")
                             {
-                                FusionNotifier.Send(new FusionNotification()
+                                Notifier.Send(new Notification()
                                 {
                                     Title = new NotificationText("Installing lobby level...", Color.cyan, true),
                                     ShowPopup = true,
@@ -254,10 +256,10 @@ namespace ModioModNetworker
                                 });
 
                                 // Native install because it was of our own volition
-                                ModInfo.RequestModInfoNumerical(mapNumber, "install_native");
+                                Data.ModInfo.RequestModInfoNumerical(mapNumber, "install_native");
                             }
                             else {
-                                FusionNotifier.Send(new FusionNotification()
+                                Notifier.Send(new Notification()
                                 {
                                     Title = new NotificationText("Cannot install this map!", Color.cyan, true),
                                     ShowPopup = true,
@@ -302,7 +304,7 @@ namespace ModioModNetworker
                 {
                     if (AvatarDownloadBar.bars.TryGetValue(ModFileManager.activeDownloadQueueElement.associatedPlayer, out var bar))
                     {
-                        ModInfo downloading = ModlistMenu.activeDownloadModInfo;
+                        Data.ModInfo downloading = ModlistMenu.activeDownloadModInfo;
                         bar.SetModName(downloading.modId);
                         bar.SetPercentage((float)downloading.modDownloadPercentage);
                     }
@@ -364,7 +366,7 @@ namespace ModioModNetworker
                     ModlistMenu.Refresh(true);
                     subsRefreshing = false;
                     handlingSubscribed = false;
-                    FusionNotifier.Send(new FusionNotification()
+                    Notifier.Send(new Notification()
                     {
                         Title = new NotificationText("Mod.io Subscriptions Refreshed!", Color.cyan, true),
                         ShowPopup = true,
@@ -429,7 +431,7 @@ namespace ModioModNetworker
 
                     if (ModFileManager.activeDownloadQueueElement.notify)
                     {
-                        FusionNotifier.Send(new FusionNotification()
+                        Notifier.Send(new Notification()
                         {
                             Title = new NotificationText($"{ModlistMenu.activeDownloadModInfo.modId} {reference}", Color.cyan, true),
                             ShowPopup = true,
@@ -457,8 +459,8 @@ namespace ModioModNetworker
                     ModFileManager.activeDownloadQueueElement = null;
                 }
             }
-            
-            ModInfo.HandleQueue();
+
+            Data.ModInfo.HandleQueue();
             ModFileManager.CheckQueue();
 
             TimerManager.Update();
@@ -492,7 +494,7 @@ namespace ModioModNetworker
             if (subsChanged)
             {
                 subsChanged = false;
-                if (NetworkInfo.HasServer && NetworkInfo.IsServer)
+                if (NetworkInfo.HasServer && NetworkInfo.IsHost)
                 {
                     SendAllMods();
                 }
@@ -570,17 +572,17 @@ namespace ModioModNetworker
             });
         }
 
-        private static void UpdateModInfo(ModInfo subscribed, InstalledModInfo installed)
+        private static void UpdateModInfo(Data.ModInfo subscribed, InstalledModInfo installed)
         {
             try
             {
-                ModInfo original = installed.ModInfo;
+                Data.ModInfo original = installed.ModInfo;
                 original.mature = subscribed.mature;
                 original.modSummary = subscribed.modSummary;
                 original.modName = subscribed.modName;
                 original.thumbnailLink = subscribed.thumbnailLink;
                 original.numericalId = subscribed.numericalId;
-                original.structureVersion = ModInfo.globalStructureVersion;
+                original.structureVersion = Data.ModInfo.globalStructureVersion;
                 original.windowsDownloadLink = subscribed.windowsDownloadLink;
                 original.androidDownloadLink = subscribed.androidDownloadLink;
 
@@ -602,7 +604,7 @@ namespace ModioModNetworker
             }
         }
 
-        public static void ReceiveSubModInfo(ModInfo modInfo, bool ignoreTag = false)
+        public static void ReceiveSubModInfo(Data.ModInfo modInfo, bool ignoreTag = false)
         {
             InstalledModInfo outOfDate = null;
             if (modInfo.version == null)
@@ -633,7 +635,7 @@ namespace ModioModNetworker
             {
                 associatedPlayer = null,
                 info = modInfo
-            });
+            }, ignoreTag);
 
             subscribedModIoNumericalIds.Add(modInfo.numericalId);
             subscribedMods.Add(modInfo);
@@ -702,7 +704,7 @@ namespace ModioModNetworker
                         valid = false;
                     }
 
-                    ModInfo modInfo = ModInfo.MakeFromDynamic((dynamic)modEntry["modfile"], name);
+                    Data.ModInfo modInfo = Data.ModInfo.MakeFromDynamic((dynamic)modEntry["modfile"], name);
                     modInfo.isValidMod = false;
                     modInfo.mature = ((int)modEntry["maturity_option"]) > 0;
                     modInfo.modName = modTitle;
@@ -777,11 +779,11 @@ namespace ModioModNetworker
             
             desiredSubs += count;
 
-            while (ModInfo.modInfoThreadRequests.TryDequeue(out var useless))
+            while (Data.ModInfo.modInfoThreadRequests.TryDequeue(out var useless))
             {
             }
 
-            ModInfo.requestSize = count;
+            Data.ModInfo.requestSize = count;
             foreach (var sub in subs["data"])
             {
                 // Make sure the sub is a mod from Bonelab
@@ -834,7 +836,7 @@ namespace ModioModNetworker
                         valid = false;
                     }
 
-                    ModInfo modInfo = ModInfo.MakeFromDynamic((dynamic)sub["modfile"], name);
+                    Data.ModInfo modInfo = Data.ModInfo.MakeFromDynamic((dynamic)sub["modfile"], name);
                     modInfo.isValidMod = false;
                     modInfo.mature = (int)sub["maturity_option"] > 0;
                     modInfo.modName = modTitle;
@@ -996,7 +998,7 @@ namespace ModioModNetworker
                     {
                         var manifestInfo = (dynamic) JsonConvert.DeserializeObject<dynamic>(File.ReadAllText(file));
 
-                        ModInfo reconstruction = new ModInfo();
+                        Data.ModInfo reconstruction = new Data.ModInfo();
 
                         try
                         {
@@ -1067,7 +1069,7 @@ namespace ModioModNetworker
                             reconstruction.windowsDownloadLink = pcDownloadLink;
                             reconstruction.modId = title;
                             reconstruction.numericalId = modId + "";
-                            reconstruction.structureVersion = ModInfo.globalStructureVersion;
+                            reconstruction.structureVersion = Data.ModInfo.globalStructureVersion;
 
                             if (networkerString != "")
                             {
@@ -1123,9 +1125,9 @@ namespace ModioModNetworker
             DeleteAllTempMods();
         }
 
-        public void OnPlayerJoin(PlayerId playerId)
+        public void OnPlayerJoin(PlayerID playerId)
         {
-            if (NetworkInfo.HasServer && NetworkInfo.IsServer)
+            if (NetworkInfo.HasServer && NetworkInfo.IsHost)
             {
                 SendAllMods();
                 SendAllAvatars();
@@ -1144,13 +1146,13 @@ namespace ModioModNetworker
             foreach (var keyPair in ModlistMessage.avatarMods)
             {
                 ModlistData avatarModData = ModlistData.Create(keyPair.Key, keyPair.Value, ModlistData.ModType.AVATAR);
-                using (var writer = FusionWriter.Create()) {
-                    using (var data = avatarModData) {
-                        writer.Write(data);
-                        using (var message = FusionMessage.ModuleCreate<ModlistMessage>(writer))
-                        {
-                            MessageSender.BroadcastMessageExcept(keyPair.Key, NetworkChannel.Reliable, message);
-                        }
+                using (var writer = NetWriter.Create())
+                {
+                    avatarModData.Serialize(writer);
+
+                    using (var message = NetMessage.ModuleCreate<ModlistMessage>(writer, CommonMessageRoutes.ReliableToClients))
+                    {
+                        MessageSender.BroadcastMessageExcept(keyPair.Key, NetworkChannel.Reliable, message);
                     }
                 }
             }
@@ -1159,18 +1161,18 @@ namespace ModioModNetworker
         private void SendAllMods()
         {
             int index = 0;
-            foreach (ModInfo id in subscribedMods)
+            foreach (Data.ModInfo id in subscribedMods)
             {
                 bool final = index == subscribedMods.Count - 1;
                 ModlistData modListData = ModlistData.Create(final, id);
-                using (var writer = FusionWriter.Create()) {
-                    using (var data = modListData) {
-                        writer.Write(data);
-                        using (var message = FusionMessage.ModuleCreate<ModlistMessage>(writer))
-                        {
-                            MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
-                        }
+                using (var writer = NetWriter.Create())
+                {
+                    modListData.Serialize(writer);
+                    using (var message = NetMessage.ModuleCreate<ModlistMessage>(writer, CommonMessageRoutes.ReliableToClients))
+                    {
+                        MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
                     }
+
                 }
                 index++;
             }

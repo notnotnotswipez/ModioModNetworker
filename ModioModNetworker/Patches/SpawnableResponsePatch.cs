@@ -11,47 +11,46 @@ namespace ModioModNetworker.Patches
 {
     public class SpawnableResponsePatch 
     {
-        [HarmonyPatch(typeof(SpawnResponseMessage), "HandleMessage", typeof(byte[]), typeof(bool))]
+        [HarmonyPatch(typeof(SpawnResponseMessage), "OnHandleMessage", typeof(ReceivedMessage))]
         public static class PatchClass
         {
-            public static bool Prefix(byte[] bytes, bool isServerHandled = false)
+            public static bool Prefix(ReceivedMessage received)
             {
-                if (!isServerHandled && MainClass.autoDownloadSpawnables)
+                if (!received.IsServerHandled && MainClass.autoDownloadSpawnables)
                 {
-                    using (var reader = FusionReader.Create(bytes))
+
+                    SpawnResponseData data = received.ReadData<SpawnResponseData>();
+
+                    if (!MainClass.confirmedHostHasIt && !MainClass.useRepo)
                     {
-                        SpawnResponseData data = reader.ReadFusionSerializable<SpawnResponseData>();
-
-                        if (!MainClass.confirmedHostHasIt && !MainClass.useRepo)
-                        {
-                            return true;
-                        }
-
-                        if (!MainClass.overrideFusionDL)
-                        {
-                            return true;
-                        }
-
-                        if (!CrateFilterer.HasCrate<GameObjectCrate>(new Barcode(data.barcode)))
-                        {
-                            
-
-                            SpawnableHoldQueue.AddToQueue(new SpawnableHoldQueueData()
-                            {
-                                missingBarcode = data.barcode,
-                                _data = data
-                            });
-                            return false;
-                        }
-
-                        if (LevelHoldQueue.LevelInQueue())
-                        {
-                            SpawnableHoldQueue.AddToQueue(data);
-                            return false;
-                        }
-
+                        return true;
                     }
+
+                    if (!MainClass.overrideFusionDL)
+                    {
+                        return true;
+                    }
+
+                    if (!CrateFilterer.HasCrate<GameObjectCrate>(new Barcode(data.Barcode)))
+                    {
+
+
+                        SpawnableHoldQueue.AddToQueue(new SpawnableHoldQueueData()
+                        {
+                            missingBarcode = data.Barcode,
+                            _data = data
+                        });
+                        return false;
+                    }
+
+                    if (LevelHoldQueue.LevelInQueue())
+                    {
+                        SpawnableHoldQueue.AddToQueue(data);
+                        return false;
+                    }
+
                 }
+
 
                 return true;
             }

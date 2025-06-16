@@ -16,7 +16,7 @@ namespace ModioModNetworker
 
         protected override void OnModuleRegistered()
         {
-            ModuleMessageHandler.RegisterHandler<ModlistMessage>();
+            ModuleMessageManager.RegisterHandler<ModlistMessage>();
         }
 
         protected override void OnModuleUnregistered()

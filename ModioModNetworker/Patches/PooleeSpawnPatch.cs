@@ -9,6 +9,7 @@ using ModioModNetworker.Utilities;
 using Il2CppSLZ;
 using Il2CppSLZ.Marrow.Pool;
 using LabFusion.Player;
+using LabFusion.Network.Serialization;
 
 namespace ModioModNetworker.Patches
 {
@@ -23,18 +24,16 @@ namespace ModioModNetworker.Patches
                 {
                     try
                     {
-                        ModInfo installedModInfo = ModInfoUtilities.GetModInfoForPoolee(__instance);
+                        Data.ModInfo installedModInfo = ModInfoUtilities.GetModInfoForPoolee(__instance);
                         if (installedModInfo != null)
                         {
-                            using (var writer = FusionWriter.Create())
+                            using (var writer = NetWriter.Create())
                             {
-                                using (var data = ModlistData.Create(PlayerIdManager.LocalId, installedModInfo, ModlistData.ModType.SPAWNABLE))
+                                var data = ModlistData.Create(PlayerIDManager.LocalID, installedModInfo, ModlistData.ModType.SPAWNABLE);
+                                data.Serialize(writer);
+                                using (var message = NetMessage.ModuleCreate<ModlistMessage>(writer, CommonMessageRoutes.ReliableToClients))
                                 {
-                                    writer.Write(data);
-                                    using (var message = FusionMessage.ModuleCreate<ModlistMessage>(writer))
-                                    {
-                                        MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
-                                    }
+                                    MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
                                 }
                             }
                         }
@@ -47,23 +46,23 @@ namespace ModioModNetworker.Patches
         }
 
         // Also patch the catchup spawn
-        [HarmonyPatch(typeof(SpawnSender), "SendCatchupSpawn", typeof(byte), typeof(string), typeof(ushort), typeof(SerializedTransform), typeof(ulong))]
+        [HarmonyPatch(typeof(SpawnSender), nameof(SpawnSender.SendCatchupSpawn), typeof(byte), typeof(string), typeof(ushort), typeof(SerializedTransform), typeof(byte))]
         private static class CatchupSpawnPatch
         {
-            public static void Prefix(byte owner, string barcode, ushort syncId, SerializedTransform serializedTransform, ulong userId)
+            public static void Prefix(byte owner, string barcode, ushort syncId, SerializedTransform serializedTransform, byte playerID)
             {
-                if (NetworkInfo.IsServer)
+                if (NetworkInfo.IsHost)
                 {
-                    ModInfo installedModInfo = ModInfoUtilities.GetModInfoForSpawnableBarcode(barcode);
+                    Data.ModInfo installedModInfo = ModInfoUtilities.GetModInfoForSpawnableBarcode(barcode);
                     if (installedModInfo != null)
                     {
-                        using (var writer = FusionWriter.Create()) {
-                            using (var data = ModlistData.Create(PlayerIdManager.LocalId, installedModInfo, ModlistData.ModType.SPAWNABLE)) {
-                                writer.Write(data);
-                                using (var message = FusionMessage.ModuleCreate<ModlistMessage>(writer))
-                                {
-                                    MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
-                                }
+                        using (var writer = NetWriter.Create())
+                        {
+                            var data = ModlistData.Create(PlayerIDManager.LocalID, installedModInfo, ModlistData.ModType.SPAWNABLE);
+                            data.Serialize(writer);
+                            using (var message = NetMessage.ModuleCreate<ModlistMessage>(writer, CommonMessageRoutes.ReliableToClients))
+                            {
+                                MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
                             }
                         }
                     }

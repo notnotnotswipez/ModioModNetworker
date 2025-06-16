@@ -314,7 +314,7 @@ namespace ModIoModNetworker.Ui
             else {
                 if (viewedInfo.windowsDownloadLink != "nothing" || viewedInfo.androidDownloadLink != "nothing")
                 {
-                    MainClass.ReceiveSubModInfo(viewedInfo);
+                    MainClass.ReceiveSubModInfo(viewedInfo, true);
                 }
                 else
                 {

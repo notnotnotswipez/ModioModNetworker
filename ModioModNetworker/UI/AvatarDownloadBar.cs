@@ -8,6 +8,7 @@ using Il2CppTMPro;
 using UnityEngine;
 using LabFusion.Player;
 using Il2CppSLZ.Marrow;
+using BoneLib;
 
 namespace ModioModNetworker.UI
 {
@@ -27,7 +28,7 @@ namespace ModioModNetworker.UI
         
         private bool previouslyStarted = false;
 
-        public static Dictionary<PlayerId, AvatarDownloadBar> bars = new Dictionary<PlayerId, AvatarDownloadBar>();
+        public static Dictionary<PlayerID, AvatarDownloadBar> bars = new Dictionary<PlayerID, AvatarDownloadBar>();
 
         public AvatarDownloadBar(NetworkPlayer rep)
         {
@@ -36,13 +37,13 @@ namespace ModioModNetworker.UI
             go.hideFlags = HideFlags.DontUnloadUnusedAsset;
             bar = go;
             go.SetActive(false);
-            if (bars.TryGetValue(rep.PlayerId, out var bar1))
+            if (bars.TryGetValue(rep.PlayerID, out var bar1))
             {
                 GameObject existingBar = bar1.bar;
                 GameObject.Destroy(existingBar);
-                bars.Remove(rep.PlayerId);
+                bars.Remove(rep.PlayerID);
             }
-            bars.Add(rep.PlayerId, this);
+            bars.Add(rep.PlayerID, this);
 
             animator = go.GetComponent<Animator>();
             this.rep = rep;
@@ -70,7 +71,7 @@ namespace ModioModNetworker.UI
             {
                 var head = manager.physicsRig.m_head;
                 bar.transform.position = head.position + Vector3.up * GetBarOffset(manager);
-                bar.transform.LookAtPlayer();
+                bar.transform.LookAt(Player.Head, Vector3.up);
             }
         }
         
